@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+develop-eggs/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+coverage.xml
+nosetests.xml
+
+# JS / Node
+node_modules/
+dist/
+build/
+.npm-install-changed.json
+
+# Env / secrets
+*.env*
+key.json
+secret.pem
+
+# macOS
+**/.DS_Store
+
+# IDEs
+.idea/
+.vscode/settings.json
+
+# devcontainer
+.devcontainer/devcontainer-lock.json
+
+# Linting caches
+.ruff_cache/
+.pytest_cache/
+
+# Logs
+*.log
+
+# Misc
+*.sqlite3
+*.mo
+*.pot
+docs/_build/
+target/

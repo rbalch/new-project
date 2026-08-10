@@ -1,0 +1,40 @@
+name: {project_name}
+
+services:
+  dev:
+    container_name: {container_name}
+    build:
+      context: .
+      dockerfile: dev.Dockerfile
+    ports:
+      - 8000:8000
+    volumes:
+      # app
+      - ./:/app:cached
+      - ../:/workspace
+      - /app/.venv  # Prevents host from overwriting container's venv
+
+      # Named volumes for persistent data
+      - root-history:/home/dev/history
+      - vscode-server:/home/dev/.vscode-server
+
+      # User config mounts
+      - ~/.ssh:/home/dev/.ssh
+      - ~/.config/gcloud:/home/dev/.config/gcloud
+      - ~/.gemini:/home/dev/.gemini
+      - ~/.cache/google-vscode-extension:/home/dev/.cache/google-vscode-extension
+      - ~/.claude:/home/dev/.claude
+      - ~/.claude.json:/home/dev/.claude.json
+      # Nix vault (universal context layer)
+      - ~/.nix-vault:/home/dev/.nix-vault
+      - /var/run/docker.sock:/var/run/docker.sock
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    environment:
+      GOOGLE_CLOUD_PROJECT: {GOOGLE_CLOUD_PROJECT}
+
+volumes:
+  root-history:
+  vscode-server:
