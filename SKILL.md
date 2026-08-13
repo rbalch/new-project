@@ -61,8 +61,8 @@ whether to proceed before writing anything.
 
 Copy every file from `~/.claude/skills/new-project/assets/` into the destination
 directory, preserving the directory structure. Include dotfiles and dot-directories —
-`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.env`, `.gitignore` are all
-easy to miss with a naive glob.
+`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.env`, `.gitignore`,
+`.mcp.json` are all easy to miss with a naive glob.
 
 Replace each placeholder in file **contents**. Two paths also carry a placeholder in
 their **name** and must be renamed:
@@ -73,6 +73,7 @@ their **name** and must be renamed:
 Full manifest:
 
 ```
+.claude/settings.json
 .claude/agents/builder.md
 .claude/agents/boundary-reviewer.md
 .claude/agents/control-author.md
@@ -101,6 +102,7 @@ tests/governance/test_check_governance.py
 .editorconfig
 .env
 .gitignore
+.mcp.json
 AGENTS.md
 compose.yaml
 dev.Dockerfile
@@ -124,6 +126,10 @@ make check     # must exit 0
 integrity checks, and runs the harness's own tests. **If it is not green, fix it before
 reporting done** — a new project that starts on a red gate teaches its user to ignore
 the gate.
+
+Do not run `make build` or `make init` as part of scaffolding. Both are the user's to
+run when they are ready to move into the container, and `make init` needs an interactive
+terminal for `gh auth login`. Mention them in the hand-off instead — see step 7.
 
 ### 6. Git setup
 
@@ -151,6 +157,17 @@ piece of this scaffold that does nothing until it is written.
 
 Then report: the directory path, files written, variables substituted, `make check`
 result, and git branches. Keep it concise.
+
+End with the two commands the user runs to move into the container, in this order:
+
+```bash
+make build
+make init KEY=~/.ssh/your-github-key   # KEY only needed the first time on a machine
+```
+
+`make init` creates the shared `dev-ssh` / `dev-gh` volumes, installs the key, verifies
+GitHub, runs `gh auth login`, and builds the code graph. Say that Claude Code needs a
+restart afterwards to pick up the codegraph MCP server declared in `.mcp.json`.
 
 ## What the harness is
 

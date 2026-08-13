@@ -1,4 +1,4 @@
-.PHONY: help build sync shell up down views views-check governance controls lint test check
+.PHONY: help build init sync shell up down views views-check governance controls lint test check
 
 .DEFAULT_GOAL := help
 
@@ -9,6 +9,46 @@ help: ## Show this help message
 
 build: ## Build Docker images
 	docker compose build
+
+# Path to the private key to install as the container's GitHub identity. Only read the
+# first time; afterwards the key lives in the dev-ssh volume and this is ignored.
+# Installed by piping its contents, not `docker compose cp`, which copies a symlink
+# verbatim and lands a dangling link in the volume.
+KEY ?= $(HOME)/.ssh/id_github
+
+init: ## First-run setup: credential volumes, ssh key, gh login, code graph (run on the HOST)
+	@test ! -f /.dockerenv || { echo "run 'make init' on the host, not inside the container"; exit 1; }
+	@docker volume create dev-ssh >/dev/null && docker volume create dev-gh >/dev/null
+	@echo "volumes    dev-ssh, dev-gh ready"
+	@docker compose up -d >/dev/null
+	@if docker compose exec -T dev test -f /home/dev/.ssh/id_github 2>/dev/null; then \
+		echo "ssh key    already installed, left alone"; \
+	else \
+		test -f "$(KEY)" || { \
+			echo "ssh key    no key at $(KEY)"; \
+			echo "           pass one: make init KEY=~/.ssh/your-github-key"; \
+			exit 1; \
+		}; \
+		docker compose exec -T dev rm -f /home/dev/.ssh/id_github; \
+		docker compose exec -T dev sh -c 'cat > /home/dev/.ssh/id_github' < "$(KEY)"; \
+		docker compose exec -T dev chmod 600 /home/dev/.ssh/id_github; \
+		echo "ssh key    installed from $(KEY)"; \
+	fi
+	@# `ssh -T` to github always exits 1 (no shell access), so match the banner instead.
+	@docker compose exec -T dev ssh -o StrictHostKeyChecking=accept-new -T git@github.com 2>&1 \
+		| grep -q 'successfully authenticated' \
+		&& echo "github ssh ok" \
+		|| { echo "github ssh FAILED — is this key registered on GitHub?"; exit 1; }
+	@if docker compose exec -T dev gh auth status >/dev/null 2>&1; then \
+		echo "gh         already authenticated"; \
+	else \
+		echo "gh         starting interactive login"; \
+		docker compose exec dev gh auth login; \
+	fi
+	@docker compose exec -T dev codegraph init
+	@echo "codegraph  indexed"
+	@echo
+	@echo "Setup complete. Restart Claude Code so it picks up the codegraph MCP server."
 
 sync: ## Sync uv dependencies
 	uv sync

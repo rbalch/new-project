@@ -1,4 +1,4 @@
-FROM python:3.13-slim AS dev
+FROM debian:trixie-slim AS dev
 
 ENV PYTHONUNBUFFERED=1
 ENV TERM=xterm-256color
@@ -19,7 +19,6 @@ RUN apt update --yes --quiet && apt install --yes --quiet --no-install-recommend
     vim \
     zsh \
     locales \
-    python3-dev \
     openssh-client \
     procps \
     gnupg \
@@ -40,7 +39,18 @@ RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
     && apt-get update && apt-get install -y google-cloud-cli
 
-# uv
+# GitHub CLI. Installed here rather than via the devcontainer feature so it exists under
+# a plain `docker compose up` too — features are applied only by the devcontainer CLI,
+# and `make init` talks to compose directly.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        -o /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list \
+    && apt-get update && apt-get install -y gh \
+    && gh --version
+
+# uv — owns the Python toolchain too, so there is no system Python to disagree with it.
 COPY --from=ghcr.io/astral-sh/uv:0.11.6 /uv /uvx /bin/
 
 ARG USERNAME=dev
@@ -64,7 +74,31 @@ WORKDIR /app
 RUN chown -R $USERNAME:$USERNAME /app
 USER $USERNAME
 
-ENV PATH="/app/.venv/bin:$PATH"
+# Every tool below installs under $HOME so it is user-owned and updatable in place
+# without a rebuild. See the update commands in README.md.
+ENV PATH="/app/.venv/bin:/home/dev/.local/bin:$PATH"
+
+# Python, managed by uv rather than by the base image.
+RUN uv python install 3.13
+
+# Credential homes. These are named volumes at run time (see compose.yaml), and Docker
+# seeds a named volume from the image *only while it is empty* — so the directories must
+# exist here with the right ownership and modes, or ssh mounts them root-owned and
+# refuses to read the keys. Editing the starter config below will NOT reach an existing
+# volume; remove the volume to re-seed it.
+RUN mkdir -p /home/dev/.ssh /home/dev/.config/gh \
+    && chmod 700 /home/dev/.ssh \
+    && ssh-keyscan github.com > /home/dev/.ssh/known_hosts 2>/dev/null \
+    && chmod 600 /home/dev/.ssh/known_hosts \
+    && printf '%s\n' \
+        'Host github.com' \
+        '  hostname github.com' \
+        '  user git' \
+        '  identitiesOnly yes' \
+        '  identityFile ~/.ssh/id_github' \
+        '  controlMaster no' \
+        > /home/dev/.ssh/config \
+    && chmod 600 /home/dev/.ssh/config
 
 # Claude Code CLI — the harness is authored interactively in this container.
 # Uses the official native installer (the npm `install` subcommand no longer
@@ -72,7 +106,11 @@ ENV PATH="/app/.venv/bin:$PATH"
 RUN curl -fsSL https://claude.ai/install.sh | bash \
     && echo 'export PATH="$HOME/.local/bin:$PATH"' >> ${HOME}/.zshrc
 
-ENV PATH="/home/dev/.local/bin:$PATH"
+# Node-based CLIs, installed user-local so `npm update -g` needs no sudo. codegraph is
+# the pre-indexed code graph agents query over MCP instead of crawling files; see
+# .mcp.json. `make init` runs `codegraph init` to build the index.
+RUN npm config set prefix "$HOME/.local" \
+    && npm install -g @colbymchenry/codegraph
 
 # oh-my-zsh + plugins
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \

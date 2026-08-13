@@ -83,14 +83,15 @@
     }
   },
 
+  // git and gh are installed in dev.Dockerfile instead of as features, so they exist
+  // under a plain `docker compose up` too — features are applied only by the
+  // devcontainer CLI, and `make init` talks to compose directly.
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "version": "latest",
       "moby": false,
       "dockerDashComposeVersion": "v2"
-    },
-    "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    }
   },
   "portsAttributes": {
     "8000": {

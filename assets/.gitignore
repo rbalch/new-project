@@ -48,6 +48,12 @@ secret.pem
 # Logs
 *.log
 
+# codegraph — a tree-sitter index is build output, and it rebuilds itself on watch
+.codegraph/
+
+# Claude Code — project settings are shared; local overrides are not
+.claude/settings.local.json
+
 # Misc
 *.sqlite3
 *.mo
