@@ -35,6 +35,10 @@ services:
       # Nix vault (universal context layer)
       - ~/.nix-vault:/home/dev/.nix-vault
       - /var/run/docker.sock:/var/run/docker.sock
+      # no-mistakes
+      - /home/dev/.no-mistakes
+      # pi
+      - /home/.pi
     stdin_open: true
     tty: true
     env_file:
