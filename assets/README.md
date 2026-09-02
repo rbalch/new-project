@@ -56,6 +56,18 @@ make controls    # every controls/fitness/*.py, plus ruff and ty
 make test        # pytest
 ```
 
+## How work gets done
+
+```
+/planner                 plan with the agent → docs/specs/, tasks/<slug>/, docs/adr/ if earned
+/orchestrate tasks/<slug>  each task: worktree → acceptance tests first → build → two reviews
+                         → one squashed commit → PR to develop → findings triaged into the ledger
+```
+
+Branches: `main` and `develop`. Agents open PRs to `develop`, one per task. `develop` to
+`main` is yours. The task file format is in `tasks/README.md`; the whole loop is in
+`AGENTS.md`.
+
 ## Governance
 
 This repo runs a ledger governance harness. Architectural rules live as decisions under

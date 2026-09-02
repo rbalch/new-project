@@ -22,7 +22,8 @@ RUN apt update --yes --quiet && apt install --yes --quiet --no-install-recommend
     openssh-client \
     procps \
     gnupg \
-    lsb-release
+    lsb-release \
+    && rm -rf /var/lib/apt/lists/*
 
 # Fix locale (resolves VSCode remote terminal issues)
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
@@ -30,14 +31,15 @@ RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
 
 # Node.js 24
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y nodejs \
-    && npm install -g npm@latest \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* \
     && node -v && npm -v
 
 # Google Cloud SDK
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
-    && apt-get update && apt-get install -y google-cloud-cli
+    && apt-get update && apt-get install -y --no-install-recommends google-cloud-cli \
+    && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI. Installed here rather than via the devcontainer feature so it exists under
 # a plain `docker compose up` too — features are applied only by the devcontainer CLI,
@@ -47,7 +49,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
     > /etc/apt/sources.list.d/github-cli.list \
-    && apt-get update && apt-get install -y gh \
+    && apt-get update && apt-get install -y --no-install-recommends gh \
+    && rm -rf /var/lib/apt/lists/* \
     && gh --version
 
 # uv — owns the Python toolchain too, so there is no system Python to disagree with it.
@@ -111,9 +114,17 @@ RUN curl -fsSL https://claude.ai/install.sh | bash \
 
 # Node-based CLIs, installed user-local so `npm update -g` needs no sudo. codegraph is
 # the pre-indexed code graph agents query over MCP instead of crawling files; see
-# .mcp.json. `make init` runs `codegraph init` to build the index.
+# .mcp.json. `make init` runs `codegraph init` to build the index, and every builder
+# re-runs it inside its worktree. Versions pinned so a rebuild is reproducible; bump
+# deliberately.
+ARG CODEGRAPH_VERSION=latest
+ARG CODEX_VERSION=latest
+ARG PI_VERSION=latest
 RUN npm config set prefix "$HOME/.local" \
-    && npm install -g @colbymchenry/codegraph @openai/codex @earendil-works/pi-coding-agent
+    && npm install -g \
+        "@colbymchenry/codegraph@${CODEGRAPH_VERSION}" \
+        "@openai/codex@${CODEX_VERSION}" \
+        "@earendil-works/pi-coding-agent@${PI_VERSION}"
 
 # oh-my-zsh + plugins
 RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended \

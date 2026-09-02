@@ -1,8 +1,9 @@
 # new-project
 
 A [Claude Code](https://claude.com/claude-code) skill that scaffolds a Python project
-with a devcontainer, a `make check` gate, and a governance harness that turns recurring
-review findings into CI-enforced rules.
+with a devcontainer, a `make check` gate, a planner → task files → orchestrator flow
+that lands one reviewed, squashed PR per task, and a governance harness that turns
+recurring review findings into CI-enforced rules.
 
 Run `/new-project my-api` and you get a directory that builds, lints, type-checks,
 tests, and refuses to let an agent quietly change the rules it works under.
@@ -24,7 +25,7 @@ appear in the skill list.
 
 The skill asks for the package name, the container name, and a GCP project id, then
 writes `./my-api`, runs `uv sync`, verifies `make check` exits 0, and initializes git
-with `main` and `dev` branches.
+with `main` and `develop` branches.
 
 It finishes by offering to fill in the four `<!-- TODO -->` sections of `AGENTS.md`.
 Those are the parts no template can supply — what the project is, its architectural
@@ -44,7 +45,8 @@ my-api/
 ├── .github/workflows/ci.yml    the same gate as make check, staged so failures are named
 ├── .claude/
 │   ├── agents/                 builder · reviewer · boundary-reviewer · control-author
-│   └── skills/                 build-loop · ledger-ops · finding-triage
+│   └── skills/                 planner · orchestrate · ledger-ops · finding-triage
+├── tasks/                      README.md is the task file format; planner writes tasks/<slug>/
 ├── governance/
 │   ├── decisions/              DEC-N-<slug>.md — the canon, retains superseded records
 │   ├── scripts/                build_views.py, check_governance.py
@@ -52,6 +54,8 @@ my-api/
 │   └── registry.json           GENERATED
 ├── controls/fitness/           the executable rules, each carrying its pragma
 ├── docs/
+│   ├── specs/                  one spec per plan, written by the planner
+│   ├── adr/                    design decisions with rejected alternatives, when earned
 │   ├── governance-harness.md   why the harness exists, and how to tell if it works
 │   └── ledger-findings.md      the experiment log
 ├── src/my_api/
@@ -130,22 +134,32 @@ A code-taste oracle. Do not try to encode readability or elegance as a control. 
 attempt produces a dumb proxy that fires on fine code and misses bad code. Taste stays
 where it belongs: a human looks at the diff and decides.
 
-## The build loop
-
-The scaffolded `.claude/` directory ships a subagent loop that feeds the harness:
+## The task flow
 
 ```
-ORCHESTRATOR
-  ├──▶ builder             writes code, ends on `make check` = 0
-  ├──▶ boundary-reviewer   live rules + the project's architectural seams
-  ├──▶ reviewer            correctness, tests, maintainability
-  └──◀ findings → builder → re-review → APPROVE at 4/5 or better
-        │
-        ▼  triage every finding, log sightings, graduate at three
+/planner                    you + the planner until the plan is agreed
+   └─▶ docs/specs/<slug>.md · tasks/<slug>/T-NN-*.md · docs/adr/ if alternatives were rejected
+
+/orchestrate tasks/<slug>   per task, in dependency order:
+   builder (own worktree)   codegraph init → acceptance tests committed RED → implement GREEN
+   boundary-reviewer        live rules + architectural seams
+   reviewer                 checks out the red commit, confirms green at HEAD, then correctness
+   orchestrator             judges every finding itself, bounces to the builder, APPROVE ≥ 4/5
+   land                     squash to one commit (what + why) → PR to develop, stacked if dependent
+   triage                   every finding binned and logged, orchestrator only, rule of three
 ```
 
-The triage step is the point, and it is the one people skip. A loop that fixes findings
-and forgets them is the problem the harness claims to solve.
+Tests come first at the **acceptance boundary only**: the task file's acceptance
+criteria become tests, committed alone, watched failing. The reviewer verifies that red
+before anything else. Unit tests below the boundary are the builder's call. That buys
+the one thing a post-hoc test cannot prove, that the test was written against the task
+and not fitted to the code, without the churn of unit-level TDD on a design nobody has
+seen yet.
+
+Dependent tasks wait for their predecessor's PR to merge. Parallelism is manual: open a
+second session and hand it a task with disjoint `files`. The triage step is the point,
+and it is the one people skip. A loop that fixes findings and forgets them is the problem
+the harness claims to solve.
 
 ## Seeded rules
 

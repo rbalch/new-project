@@ -46,25 +46,38 @@ disagreement.
 
 ## How work gets done here
 
-**Use the `build-loop` skill.** It is how a scoped work item gets built: you
-orchestrate, subagents write and review, and the findings feed the ledger instead of
-evaporating.
+Two skills, in order. **`planner`** turns a conversation into a spec and task files.
+**`orchestrate`** turns task files into reviewed, squashed PRs against `develop`, and
+feeds every finding into the ledger instead of letting it evaporate.
 
 ```
-ORCHESTRATOR (you)
-  │   ┌───────────────────────────── the loop ─────────────────────────────┐
-  ├──▶│ builder             writes code, ends on `make check` = 0           │
-  ├──▶│ boundary-reviewer   live rules + this project's architectural seams │
-  ├──▶│ reviewer            correctness, tests, maintainability             │
-  └──◀│ findings → builder → re-review → APPROVE and score ≥ 4/5           │
-      └─────────────────────────────────────────────────────────────────────┘
-  │
-  ▼  ═══ loop closed. The rest is what makes this a ledger repo. ═══
+/planner                       you + the planner, until the plan is agreed
+   └─▶ docs/specs/<slug>.md, tasks/<slug>/T-NN-*.md, docs/adr/ (only if alternatives were rejected)
+
+/orchestrate tasks/<slug>      ORCHESTRATOR (you, on develop, never in a worktree)
+  │   ┌───────────────────────────── one task ─────────────────────────────┐
+  ├──▶│ builder (worktree)   codegraph init → acceptance tests RED → GREEN │
+  ├──▶│ boundary-reviewer    live rules + this project's architectural seams│
+  ├──▶│ reviewer             red-then-green proof, correctness, tests, shape│
+  └──◀│ findings → you judge → builder → re-review → APPROVE, score ≥ 4/5  │
+      │ squash to one commit → push → PR to develop                        │
+      └───────────────────────────────────────────────────────────────────┘
+  ▼  ═══ per task, after the PR is open. This is what makes it a ledger repo. ═══
   ├─ triage every finding → Bin 1 (lintable) / Bin 2 (systemic) / Bin 3 (taste)
-  ├─ log sightings in docs/ledger-findings.md
+  ├─ log sightings in docs/ledger-findings.md — orchestrator only
   ├─ a Bin 2 finding on its third sighting → control-author
-  └─ make check, commit, Manual QA write-back
+  └─ next task, if its dependencies have merged; otherwise wait for the human
 ```
+
+**Tests at the acceptance boundary come first.** The task file's acceptance criteria
+become tests, committed alone, watched failing, before any implementation. The reviewer
+checks out that commit and confirms the red. Unit tests below the boundary are the
+builder's call. A criterion that turns out wrong is a planning finding for the human,
+never a test to quietly rewrite.
+
+**Branches.** Work lands on `develop` by PR, one PR per task, one squashed commit per
+PR whose body says what changed and why. `develop` to `main` is a human's PR. A task
+that depends on an unmerged task waits; nothing builds on an unreviewed branch.
 
 **The triage step is the point, and it is the one people skip.** A loop that fixes
 findings and forgets them is exactly the problem the harness exists to solve: the
@@ -75,13 +88,15 @@ Skipping triage means running the experiment while discarding the data.
 
 | | What it is for |
 |---|---|
-| `build-loop` (skill) | The whole loop. Start here for any scoped work item. |
-| `builder` (agent) | Writes code. Reads `RULES.md` first, never evades a control. |
+| `planner` (skill) | Plan with the human. Writes the spec, the task files, an ADR if earned. |
+| `orchestrate` (skill) | Runs task files through build → review → PR → triage. Start here for any task. |
+| `builder` (agent) | One task, in a worktree. Acceptance tests first. Never evades a control. |
 | `boundary-reviewer` (agent) | Live rules and this project's architectural seams. Reports; never edits. |
-| `reviewer` (agent) | Correctness, tests, maintainability. Owns `review.md` / `review.json`. |
+| `reviewer` (agent) | Red-then-green proof, correctness, tests, maintainability. Owns `review.md` / `review.json`. |
 | `finding-triage` (skill) | Sort one dislike into a bin. Apply the rule of three. |
 | `control-author` (agent) | Turn a thrice-sighted Bin 2 finding into a decision plus control. |
 | `ledger-ops` (skill) | Harness mechanics: author, supersede, add a control, debug a red gate. |
+| `tasks/README.md` | The task file format. |
 
 ### When not to use the loop
 
@@ -98,6 +113,8 @@ change was made.
 - **Touched a decision? Run `make views`.** The view and `registry.json` are generated
   from `governance/decisions/`. A stale one fails the *next* task's gate for reasons
   that look unrelated to it.
+- **Reviewers start in the root checkout, not the worktree.** Every reviewer brief
+  opens with the worktree path. A gate run in the wrong tree reviews the wrong code.
 - **Blocked by a rule is a valid, wanted outcome.** Say so and stop. Do not raise a
   threshold, delete a pragma, or reach for `# noqa`. Reporting it is the most useful
   thing you can do; working around it quietly corrupts the experiment and nobody finds

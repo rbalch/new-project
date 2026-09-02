@@ -1,6 +1,6 @@
 ---
 name: new-project
-description: Scaffold a new project directory with a standardized devcontainer, compose, Dockerfile, Makefile, pyproject.toml, and the ledger governance harness (decisions, controls, generated rule view, build/review agents). Copies template files from assets/ and substitutes {variable} placeholders with user-provided values.
+description: Scaffold a new project directory with a standardized devcontainer, compose, Dockerfile, Makefile, pyproject.toml, the planner → task files → orchestrate flow (worktree per task, acceptance tests first, two reviewers, squashed PR to develop), and the ledger governance harness (decisions, controls, generated rule view). Copies template files from assets/ and substitutes {variable} placeholders with user-provided values.
 user-invocable: true
 command: new-project
 ---
@@ -12,9 +12,11 @@ Scaffold a new project directory from the templates in `~/.claude/skills/new-pro
 The scaffold is two layers:
 
 - **The dev environment** — devcontainer, compose, Dockerfile, Makefile, pyproject.
+- **The task flow** — the `planner` skill (conversation → spec + task files), the
+  `orchestrate` skill (task file → worktree → acceptance tests first → build → two
+  reviews → one squashed PR to `develop`), and the agents they dispatch.
 - **The ledger governance harness** — decisions, executable controls, a generated rule
-  view, the integrity check, its tests, and the agents and skills that drive the
-  build→review→triage loop. See "What the harness is" at the bottom.
+  view, the integrity check, and its tests. See "What the harness is" at the bottom.
 
 ## Variables
 
@@ -61,7 +63,7 @@ whether to proceed before writing anything.
 
 Copy every file from `~/.claude/skills/new-project/assets/` into the destination
 directory, preserving the directory structure. Include dotfiles and dot-directories —
-`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.env`, `.gitignore`,
+`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.env.example`, `.gitignore`,
 `.mcp.json` are all easy to miss with a naive glob.
 
 Replace each placeholder in file **contents**. Two paths also carry a placeholder in
@@ -78,21 +80,25 @@ Full manifest:
 .claude/agents/boundary-reviewer.md
 .claude/agents/control-author.md
 .claude/agents/reviewer.md
-.claude/skills/build-loop/SKILL.md
 .claude/skills/finding-triage/SKILL.md
 .claude/skills/ledger-ops/SKILL.md
+.claude/skills/orchestrate/SKILL.md
+.claude/skills/planner/SKILL.md
 .devcontainer/devcontainer.json
 .github/workflows/ci.yml
 controls/fitness/view_naming.py
 controls/lint/.gitkeep
+docs/adr/.gitkeep
 docs/governance-harness.md
 docs/ledger-findings.md
+docs/specs/.gitkeep
 governance/decisions/DEC-0-generated-view-is-not-agents-md.md
 governance/registry.json          # generated — regenerated in step 5
 governance/scripts/build_views.py
 governance/scripts/check_governance.py
 governance/views/RULES.md         # generated — regenerated in step 5
 src/{package_name}/__init__.py
+tasks/README.md
 tests/__init__.py
 tests/governance/__init__.py
 tests/governance/conftest.py
@@ -100,7 +106,7 @@ tests/governance/ledger.py
 tests/governance/test_build_views.py
 tests/governance/test_check_governance.py
 .editorconfig
-.env
+.env.example
 .gitignore
 .mcp.json
 AGENTS.md
@@ -139,11 +145,11 @@ git init
 git checkout -b main
 git add .
 git commit -m "chore: initial project scaffold"
-git checkout -b dev
+git checkout -b develop
 ```
 
 Unless the user specified different branch names in their request, use `main` as the
-default branch and create a `dev` branch off it.
+default branch and create a `develop` branch off it.
 
 ### 7. Fill in AGENTS.md, then confirm
 
@@ -168,6 +174,11 @@ make init KEY=~/.ssh/your-github-key   # KEY only needed the first time on a mac
 `make init` creates the shared `dev-ssh` / `dev-gh` volumes, installs the key, verifies
 GitHub, runs `gh auth login`, and builds the code graph. Say that Claude Code needs a
 restart afterwards to pick up the codegraph MCP server declared in `.mcp.json`.
+
+Then name the first real command: `/planner`, run from `develop`, which produces the
+task files that `/orchestrate` consumes. Mention that the repo needs a GitHub remote
+before `/orchestrate` runs, since it opens PRs, and that the repo's merge method for
+task PRs should be **rebase and merge** so stacked task branches fast-forward.
 
 ## What the harness is
 

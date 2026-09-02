@@ -3,5 +3,8 @@
     "allow": [
       "mcp__codegraph__*"
     ]
+  },
+  "worktree": {
+    "baseRef": "head"
   }
 }

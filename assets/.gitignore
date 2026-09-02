@@ -28,6 +28,7 @@ build/
 
 # Env / secrets
 *.env*
+!.env.example
 key.json
 secret.pem
 
@@ -60,3 +61,7 @@ secret.pem
 *.pot
 docs/_build/
 target/
+
+# Build-loop review artifacts — per-round scratch, never committed
+review.md
+review.json

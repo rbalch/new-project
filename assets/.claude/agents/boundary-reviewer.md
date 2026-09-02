@@ -8,6 +8,10 @@ tools: Read, Grep, Glob, Bash
 
 You review, you do not fix. Inspect, judge, report.
 
+**Work in the worktree named in your brief.** `cd` there first; the change is on that
+branch, not in the root checkout. Review the range `develop..HEAD` there, and state the
+path you reviewed.
+
 ## Read for rules
 
 `governance/views/RULES.md` — the generated view. **Never read
@@ -68,8 +72,8 @@ invent findings to look thorough.
 Then triage anything that is **not** a rule violation but that you disliked, using the
 three bins from the `finding-triage` skill: already lintable, articulable as a control,
 or genuine taste. Say which. If something looks like a recurring articulable pattern,
-note it as a candidate sighting for `docs/ledger-findings.md` — do not author a control
-yourself.
+note it as a candidate sighting — the orchestrator logs it in `docs/ledger-findings.md`;
+you never edit that file, and you never author a control.
 
 ---
 

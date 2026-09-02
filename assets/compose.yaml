@@ -38,11 +38,13 @@ services:
       # no-mistakes
       - /home/dev/.no-mistakes
       # pi
-      - /home/.pi
+      - /home/dev/.pi
     stdin_open: true
     tty: true
     env_file:
-      - .env
+      # Optional: .env is gitignored, so a fresh clone has none until you copy .env.example.
+      - path: .env
+        required: false
     environment:
       GOOGLE_CLOUD_PROJECT: {GOOGLE_CLOUD_PROJECT}
 
