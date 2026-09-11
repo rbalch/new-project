@@ -15,6 +15,7 @@ RUN apt update --yes --quiet && apt install --yes --quiet --no-install-recommend
     rsync \
     tmux \
     git \
+    git-lfs \
     sudo \
     vim \
     zsh \

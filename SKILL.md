@@ -13,8 +13,10 @@ The scaffold is two layers:
 
 - **The dev environment** — devcontainer, compose, Dockerfile, Makefile, pyproject.
 - **The task flow** — the `planner` skill (conversation → spec + task files), the
-  `orchestrate` skill (task file → worktree → acceptance tests first → build → two
-  reviews → one squashed PR to `develop`), and the agents they dispatch.
+  `orchestrate` skill (task file → task-critic → worktree → acceptance tests first →
+  build → two reviews → one squashed PR to `develop`), and the agents they dispatch.
+  Task status is never stored: `make tasks` derives it from PR state (see "Task
+  tracking" at the bottom).
 - **The ledger governance harness** — decisions, executable controls, a generated rule
   view, the integrity check, and its tests. See "What the harness is" at the bottom.
 
@@ -80,6 +82,7 @@ Full manifest:
 .claude/agents/boundary-reviewer.md
 .claude/agents/control-author.md
 .claude/agents/reviewer.md
+.claude/agents/task-critic.md
 .claude/skills/finding-triage/SKILL.md
 .claude/skills/ledger-ops/SKILL.md
 .claude/skills/orchestrate/SKILL.md
@@ -97,6 +100,7 @@ governance/registry.json          # generated — regenerated in step 5
 governance/scripts/build_views.py
 governance/scripts/check_governance.py
 governance/views/RULES.md         # generated — regenerated in step 5
+scripts/task-status.py            # make tasks — task status derived from PR state
 src/{package_name}/__init__.py
 tasks/README.md
 tests/__init__.py
@@ -105,6 +109,7 @@ tests/governance/conftest.py
 tests/governance/ledger.py
 tests/governance/test_build_views.py
 tests/governance/test_check_governance.py
+tests/test_task_status.py          # guards make tasks: plan discovery, frontmatter, prefix rule
 .editorconfig
 .env.example
 .gitignore
@@ -204,3 +209,28 @@ file may be named `AGENTS.md`. That is a structural invariant of the harness its
 a project rule. Everything after it should be *discovered* through review, at three
 sightings, via the `finding-triage` skill. Do not seed rules speculatively when
 scaffolding — rules imagined in advance are usually taste dressed as controls.
+
+## Task tracking
+
+`tasks/<slug>/` is **untracked** (`.gitignore`: `tasks/*`, `!tasks/README.md`). Task files
+are local working notes; agents in worktrees read them by absolute path from the root
+checkout, and each PR carries its brief verbatim in a `<details>` block, so the merged
+PR is the permanent record. Task files carry no `status` field either. Status is a
+function of GitHub PR state, computed by
+`scripts/task-status.py` (`make tasks PLAN=tasks/<slug>`, or `make tasks` for every
+plan). Task ids are `<PREFIX>-NN`; each plan owns one prefix (`T`, `CT`, …) and no two
+plans share one, since the PR title is the only thing that ties a PR to its plan.
+`make tasks` refuses a malformed plan with a message naming the file and the rule.
+
+| PR titled `<id>: …` | status |
+|---|---|
+| merged | `done` |
+| open | `in_review` |
+| none, all `depends_on` done | `ready` — the next thing to build |
+| none, a dependency not done | `blocked` |
+
+This works because orchestrate titles every PR `<id>: <title>`, so the title is the join
+key. The orchestrator runs `make tasks` at batch start to pick the next `ready` task and
+again after each PR. Nobody edits a task file to move it; a human merging the PR is what
+closes it. The old stored `status:` field went stale every time, because the merge
+happens after the orchestrator has stopped.

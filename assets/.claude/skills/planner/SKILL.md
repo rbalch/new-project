@@ -11,7 +11,7 @@ you write none of them until the human says the plan is agreed.
 
 ```
 conversation ──▶ agreed plan ──▶ docs/specs/<slug>.md
-                                 tasks/<slug>/T-NN-<slug>.md   (one per task)
+                                 tasks/<slug>/<PREFIX>-NN-<slug>.md   (one per task)
                                  docs/adr/NNNN-<slug>.md       (only if alternatives were rejected)
 ```
 
@@ -25,8 +25,9 @@ conversation ──▶ agreed plan ──▶ docs/specs/<slug>.md
   Never read `governance/decisions/` for rules.
 - `docs/specs/` and `docs/adr/` — prior plans and decisions. Do not re-decide something
   already decided; cite it.
-- `tasks/` — anything still `todo` or `in_progress`. A new plan that overlaps unfinished
-  work needs to say so.
+- `make tasks` — anything not yet `done`. A new plan that overlaps unfinished work needs
+  to say so. `tasks/<slug>/` is untracked (only `tasks/README.md` is in git); the files
+  live on this machine and the merged PRs hold the shipped briefs.
 
 ## 1. The conversation
 
@@ -60,9 +61,12 @@ The plan in prose, for a human to read and for tasks to link back to. Short. Sec
 - **Tasks** — the ordered list of task ids and titles, with the dependency edges.
 - **Open questions** — anything deferred, and who owns it.
 
-## 3. The tasks — `tasks/<slug>/T-NN-<slug>.md`
+## 3. The tasks — `tasks/<slug>/<PREFIX>-NN-<slug>.md`
 
-Follow the format in `tasks/README.md` exactly. Per task:
+Follow the format in `tasks/README.md` exactly. First pick the plan's id prefix: `T` if
+no other plan exists, otherwise a short uppercase prefix from the slug that no directory
+under `tasks/` already uses (`critic-tooling` → `CT`). Every id in the plan carries that
+prefix, and the PR titles will too. Per task:
 
 - **Self-contained.** A builder gets the task file, `AGENTS.md` and `RULES.md`, nothing
   else. Anything it needs beyond those is in the task's Context section, or linked to a
@@ -81,6 +85,10 @@ Follow the format in `tasks/README.md` exactly. Per task:
   a reviewer could not hold in one pass.
 
 Order the ids so a dependency always has a lower number than its dependents.
+
+After writing the files run `make tasks PLAN=tasks/<slug>`. It validates the frontmatter,
+the prefix and the dependency edges, and shows every task `ready` or `blocked`. A
+message instead of a listing is a planning error to fix before hand-off.
 
 ## 4. The ADR — only when earned
 

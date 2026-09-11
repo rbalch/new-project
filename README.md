@@ -44,9 +44,10 @@ my-api/
 ├── .devcontainer/
 ├── .github/workflows/ci.yml    the same gate as make check, staged so failures are named
 ├── .claude/
-│   ├── agents/                 builder · reviewer · boundary-reviewer · control-author
+│   ├── agents/                 task-critic · builder · reviewer · boundary-reviewer · control-author
 │   └── skills/                 planner · orchestrate · ledger-ops · finding-triage
-├── tasks/                      README.md is the task file format; planner writes tasks/<slug>/
+├── tasks/                      README.md is the task file format; tasks/<slug>/ is untracked, the PR keeps the brief
+├── scripts/task-status.py      make tasks — status derived from PR state, never stored
 ├── governance/
 │   ├── decisions/              DEC-N-<slug>.md — the canon, retains superseded records
 │   ├── scripts/                build_views.py, check_governance.py
@@ -138,7 +139,7 @@ where it belongs: a human looks at the diff and decides.
 
 ```
 /planner                    you + the planner until the plan is agreed
-   └─▶ docs/specs/<slug>.md · tasks/<slug>/T-NN-*.md · docs/adr/ if alternatives were rejected
+   └─▶ docs/specs/<slug>.md · tasks/<slug>/<PREFIX>-NN-*.md · docs/adr/ if alternatives were rejected
 
 /orchestrate tasks/<slug>   per task, in dependency order:
    builder (own worktree)   codegraph init → acceptance tests committed RED → implement GREEN
