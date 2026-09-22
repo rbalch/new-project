@@ -182,8 +182,9 @@ restart afterwards to pick up the codegraph MCP server declared in `.mcp.json`.
 
 Then name the first real command: `/planner`, run from `develop`, which produces the
 task files that `/orchestrate` consumes. Mention that the repo needs a GitHub remote
-before `/orchestrate` runs, since it opens PRs, and that the repo's merge method for
-task PRs should be **rebase and merge** so stacked task branches fast-forward.
+before `/orchestrate` runs, since it opens PRs. Stacked task PRs merge bottom-up;
+each is one commit, so rebase-merge or squash both work, and orchestrate restacks the
+rest on its next run.
 
 ## What the harness is
 
@@ -226,8 +227,8 @@ plans share one, since the PR title is the only thing that ties a PR to its plan
 |---|---|
 | merged | `done` |
 | open | `in_review` |
-| none, all `depends_on` done | `ready` — the next thing to build |
-| none, a dependency not done | `blocked` |
+| none, all `depends_on` done or open | `ready` — build next, stacked on an open dependency's branch |
+| none, a dependency unbuilt | `blocked` |
 
 This works because orchestrate titles every PR `<id>: <title>`, so the title is the join
 key. The orchestrator runs `make tasks` at batch start to pick the next `ready` task and

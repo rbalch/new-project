@@ -2,8 +2,10 @@
 """Print the live status of every task in a plan directory.
 
 Status is derived, not stored: a task is ``done`` when a PR titled ``<id>: ...``
-has merged, ``in_review`` when one is open, ``blocked`` when a dependency is not
-done, and ``ready`` otherwise. Usage::
+has merged, ``in_review`` when one is open, ``ready`` when every dependency is done
+or in review, and ``blocked`` otherwise. A ready task whose dependencies are still in
+review stacks: its branch starts from the newest dependency branch, and the listing
+names that branch. Usage::
 
     make tasks PLAN=tasks/<plan-slug>   # one plan
     make tasks                          # every plan under tasks/
@@ -116,7 +118,7 @@ def load_plan(plan: Path, tasks_root: Path = Path('tasks')) -> list[Task]:
 def pr_index() -> dict[str, dict]:
     """Map task id -> PR record. Merged beats open beats closed if a task has several."""
     raw = subprocess.run(
-        ['gh', 'pr', 'list', '--state', 'all', '--limit', '200', '--json', 'number,title,state,url'],
+        ['gh', 'pr', 'list', '--state', 'all', '--limit', '200', '--json', 'number,title,state,url,headRefName'],
         check=True,
         capture_output=True,
         text=True,
@@ -133,7 +135,37 @@ def pr_index() -> dict[str, dict]:
     return index
 
 
+def ancestors(tid: str, by_id: dict[str, Task]) -> set[str]:
+    """Every task id ``tid`` depends on, directly or transitively."""
+    seen: set[str] = set()
+    todo = list(by_id[tid].depends_on)
+    while todo:
+        d = todo.pop()
+        if d not in seen:
+            seen.add(d)
+            todo.extend(by_id[d].depends_on)
+    return seen
+
+
+def stack_on(t: Task, by_id: dict[str, Task], status: dict[str, str]) -> str | None:
+    """The in-review dependency whose branch this task stacks on, or None for develop.
+
+    A stacked branch holds every in-review task beneath it, so the base is the one
+    in-review dependency that has all the others as ancestors. Raises ValueError when
+    no single one does: two unmerged dependencies on separate branches cannot share a
+    base, and the task waits for a merge.
+    """
+    open_deps = [d for d in t.depends_on if status.get(d) == 'in_review']
+    if not open_deps:
+        return None
+    for d in open_deps:
+        if set(open_deps) - {d} <= ancestors(d, by_id):
+            return d
+    raise ValueError(f'{t.id}: in-review dependencies {open_deps} are on separate branches')
+
+
 def derive_status(tasks: list[Task], prs: dict[str, dict]) -> dict[str, str]:
+    by_id = {t.id: t for t in tasks}
     status: dict[str, str] = {}
     for t in tasks:  # sorted by id, deps always point backwards
         pr = prs.get(t.id)
@@ -141,8 +173,12 @@ def derive_status(tasks: list[Task], prs: dict[str, dict]) -> dict[str, str]:
             status[t.id] = 'done'
         elif pr and pr['state'] == 'OPEN':
             status[t.id] = 'in_review'
-        elif all(status.get(d) == 'done' for d in t.depends_on):
-            status[t.id] = 'ready'
+        elif all(status.get(d) in ('done', 'in_review') for d in t.depends_on):
+            try:
+                stack_on(t, by_id, status)
+                status[t.id] = 'ready'
+            except ValueError:
+                status[t.id] = 'blocked'
         else:
             status[t.id] = 'blocked'
     return status
@@ -150,6 +186,7 @@ def derive_status(tasks: list[Task], prs: dict[str, dict]) -> dict[str, str]:
 
 def report(plan: Path, tasks: list[Task], prs: dict[str, dict]) -> None:
     status = derive_status(tasks, prs)
+    by_id = {t.id: t for t in tasks}
     width = max(len(t.title) for t in tasks)
     print(f'# {plan}')
     for t in tasks:
@@ -159,6 +196,9 @@ def report(plan: Path, tasks: list[Task], prs: dict[str, dict]) -> None:
         if s == 'blocked':
             waiting = [d for d in t.depends_on if status.get(d) != 'done']
             tail = f'waits on {", ".join(waiting)}'
+        elif s == 'ready':
+            base = stack_on(t, by_id, status)
+            tail = f'stacks on {base} ({prs[base].get("headRefName", "?")})' if base else 'from develop'
         print(f'{ICON[s]} {t.id}  {s:<10} {t.title:<{width}}  {tail}')
 
     counts = {s: sum(1 for v in status.values() if v == s) for s in ICON}

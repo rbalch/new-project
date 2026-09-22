@@ -30,7 +30,8 @@ tasks list in their `files:` blocks, plus the fixture under `tests/fixtures/`.
 
 Every function, class, method, field, module, fixture, or CLI flag named anywhere in
 **Scope** or **Acceptance** must exist in one of: the fixture target, the files of a
-dependency task that `make tasks` reports `done`, or this task's own `files:` list (in which
+dependency task that `make tasks` reports `done` or `in_review` (read the latter on its PR
+branch: `git show <branch>:<path>`), or this task's own `files:` list (in which
 case it is being created, and that is fine). Grep for each one. A name that exists
 nowhere is a finding; say where you looked.
 
@@ -51,12 +52,21 @@ failure the criterion is about, so a test would pass vacuously; or the criterion
 something no test can observe from outside (a model's judgement, a timing, a "feels
 right"). Name the bullet and say what a test would need that is not there.
 
-### 4. Footprint and dependencies
+### 4. Try it can be run
+
+Every command, flag, import or file named in **Try it** must exist once this task and
+its `depends_on` tasks have merged: in the tree, in a dependency's `files:`, or in this
+task's Scope. A step that needs a later task's code is a finding. So is a vague step
+("check it works") with no command or expected output. `None — <reason>` is allowed;
+`None` with no reason, or a missing section, is a finding.
+
+### 5. Footprint and dependencies
 
 `files:` is the expected footprint. If implementing the scope plainly requires touching a
 file outside it — an upstream model that must widen, a schema column that must change —
 say so now, so it is a declared change rather than a reported deviation. Confirm `make tasks`
-reports every `depends_on` task `done`; if one is `in_review`, say so, but that is the
+reports every `depends_on` task `done` or `in_review` (stacked); if one is `in_review`,
+read its files on that PR's branch, not on `develop`. Anything else is the
 orchestrator's gate, not yours.
 
 ## What you do not do
