@@ -38,11 +38,12 @@ always has a lower number than its dependents.
 ---
 id: T-02
 plan: <plan-slug>                  # tasks/<plan-slug>/, matches docs/specs/<plan-slug>.md
-title: Add the repository layer for orders
-depends_on: [T-01]                 # ids that must be merged first; [] if none (inline or block list)
+title: Add `orders add` and `orders list` backed by SQLite
+depends_on: [T-01]                 # ids whose code this needs; [] if none (inline or block list)
 files:                             # what this task expects to create or edit
   - src/{package_name}/orders/repository.py
-  - tests/orders/test_repository.py
+  - src/{package_name}/cli.py
+  - tests/orders/test_orders_cli.py
 rules: [DEC-0]                     # DEC ids from RULES.md that plausibly apply; [] if none
 ---
 
@@ -67,8 +68,8 @@ Runnable checks, each with the command and the expected result. These are the co
 the builder writes tests against **before** implementing. If an acceptance criterion
 cannot be expressed as a test, say so and name what a human checks instead.
 
-- `uv run pytest tests/orders/test_repository.py -q` → exit 0, covers: create, get by id,
-  get missing raises `OrderNotFound`
+- `uv run pytest tests/orders/test_orders_cli.py -q` → exit 0, covers: add, list, get
+  missing raises `OrderNotFound`
 - `make check` → exit 0
 
 ## Context
@@ -77,17 +78,27 @@ Facts a fresh agent cannot derive from the tree: prior decisions from the spec, 
 shape of neighbouring code it should match, external constraints, what was tried and
 rejected. Link the spec section rather than restating it at length.
 
-## Manual QA
+## Try it
 
-What the human looks at after merge, if anything, and what "correct" looks like.
-`None.` is a valid answer.
+The agreement on what this task built: steps the human runs on a fresh checkout of the
+branch, and what they should see. Exact commands or a paste-able Python snippet, each
+followed by the expected output shape. The builder runs them before implementing (they
+fail) and after (they pass), the reviewer re-runs them as a required check, and the PR
+carries the builder's real output. Green tests with a failing Try it is not done.
+
+    uv run {package_name} orders add --sku ABC --qty 2   # → "created order 1"
+    uv run {package_name} orders list                    # → table with one row: 1 ABC 2
+    sqlite3 .data/app.db 'select * from orders'          # → 1|ABC|2|<timestamp>
+
+Plumbing-only tasks write `None — <reason>`; the planner keeps them rare.
 ```
 
 ## Rules
 
 - **`depends_on` is a merge dependency**, not a "nice to have first". A task lists a
   dependency only when it cannot be built or tested without that task's code present.
-  Dependent tasks wait; they never build speculatively on an unmerged branch.
+  A dependent task stacks on its dependency's branch once that PR is open, and its PR
+  targets that branch. It never branches off an unbuilt dependency.
 - **`files` is the parallelism signal.** Two tasks with no dependency and disjoint
   `files` can run in separate sessions at the same time. Overlapping `files` means run
   them in order, even with no logical dependency. The list is an expectation, not a
@@ -97,12 +108,15 @@ What the human looks at after merge, if anything, and what "correct" looks like.
   that is a planning error to report, not a test to quietly rewrite.
 - **Status is derived, never stored.** `make tasks PLAN=tasks/<slug>` reads PR state:
   a merged PR titled `<id>: …` is `done`, an open one `in_review`, all dependencies
-  done `ready`, otherwise `blocked`. `make tasks` with no `PLAN` reports every plan.
+  done or in review `ready` (stacked on the newest dependency branch if any is open), otherwise `blocked`. `make tasks` with no `PLAN` reports every plan.
   Nobody edits a task file to change its status. Builders never edit task files at all.
 - **`make tasks` is the format check.** It exits with a message, not a traceback, when
   the plan directory is missing, has no task files, a file lacks `id`/`title`/
   `depends_on`, an id is malformed, prefixes are mixed or shared, or `depends_on` names
   an id the plan does not have. The planner runs it once after writing the files.
+- **Every task is a slice the human can run.** T-01 is a skeleton that starts; each
+  later task adds one command, flag, function or artifact the human can try from the
+  branch. Slices cross layers; that is the point. See the planner's *Slice for the
+  human*.
 - **Small enough for one review loop.** If a task needs more than roughly one day of
-  human-equivalent work, or touches more than one architectural layer, the planner splits
-  it.
+  human-equivalent work, the planner splits it by feature, not by layer.

@@ -226,8 +226,8 @@ plans share one, since the PR title is the only thing that ties a PR to its plan
 |---|---|
 | merged | `done` |
 | open | `in_review` |
-| none, all `depends_on` done | `ready` — the next thing to build |
-| none, a dependency not done | `blocked` |
+| none, all `depends_on` done or open | `ready` — build next, stacked on an open dependency's branch |
+| none, a dependency unbuilt | `blocked` |
 
 This works because orchestrate titles every PR `<id>: <title>`, so the title is the join
 key. The orchestrator runs `make tasks` at batch start to pick the next `ready` task and

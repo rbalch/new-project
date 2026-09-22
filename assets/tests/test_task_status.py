@@ -104,9 +104,34 @@ def test_status_derivation() -> None:
     assert ts.derive_status(tasks, prs) == {
         'T-01': 'done',
         'T-02': 'in_review',
-        'T-03': 'blocked',
+        'T-03': 'ready',  # stacks on T-02's branch
         'T-04': 'ready',
     }
+
+
+def test_stack_base_is_the_newest_open_dependency() -> None:
+    tasks = [
+        ts.Task(id='T-01', title='a', depends_on=[]),
+        ts.Task(id='T-02', title='b', depends_on=['T-01']),
+        ts.Task(id='T-03', title='c', depends_on=['T-01', 'T-02']),
+        ts.Task(id='T-04', title='d', depends_on=['T-03']),
+    ]
+    prs = {'T-01': {'state': 'OPEN'}, 'T-02': {'state': 'OPEN'}}
+    status = ts.derive_status(tasks, prs)
+    by_id = {t.id: t for t in tasks}
+    assert status['T-03'] == 'ready'
+    assert ts.stack_on(by_id['T-03'], by_id, status) == 'T-02'
+    assert status['T-04'] == 'blocked'  # T-03 not built yet
+
+
+def test_open_dependencies_on_separate_branches_block() -> None:
+    tasks = [
+        ts.Task(id='T-01', title='a', depends_on=[]),
+        ts.Task(id='T-02', title='b', depends_on=[]),
+        ts.Task(id='T-03', title='c', depends_on=['T-01', 'T-02']),
+    ]
+    prs = {'T-01': {'state': 'OPEN'}, 'T-02': {'state': 'OPEN'}}
+    assert ts.derive_status(tasks, prs)['T-03'] == 'blocked'
 
 
 def test_no_plan_arg_means_every_plan(tmp_path: Path) -> None:

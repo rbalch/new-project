@@ -157,8 +157,9 @@ the one thing a post-hoc test cannot prove, that the test was written against th
 and not fitted to the code, without the churn of unit-level TDD on a design nobody has
 seen yet.
 
-Dependent tasks wait for their predecessor's PR to merge. Parallelism is manual: open a
-second session and hand it a task with disjoint `files`. The triage step is the point,
+Dependent tasks stack: each branches off its predecessor's open PR, so one run leaves a
+chain of PRs to try and merge bottom-up. Parallelism is manual: open a second session
+and hand it a task with disjoint `files`. The triage step is the point,
 and it is the one people skip. A loop that fixes findings and forgets them is the problem
 the harness claims to solve.
 

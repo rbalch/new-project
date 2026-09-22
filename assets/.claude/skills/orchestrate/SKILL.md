@@ -75,9 +75,11 @@ Then confirm the starting state:
   gate means you cannot tell which failures a task caused.
 - Run `make tasks PLAN=tasks/<slug>`. Status is **derived from PR state**, never
   stored in the task file: a merged `<id>:` PR is `done`, an open one is `in_review`,
-  all dependencies done is `ready`, anything else is `blocked`. Build only `ready`
-  tasks. **A dependency that is still `in_review` means wait.** Do not build on an
-  unmerged branch. Report it and stop at that task.
+  every dependency done or in review is `ready`, anything else is `blocked`. Build only
+  `ready` tasks. **A ready task whose dependency is still `in_review` stacks:** its
+  branch starts from that dependency's branch, which `make tasks` names
+  (`stacks on T-02 (<branch>)`). The human comes back to a chain of PRs, each one
+  testable on top of the last.
 - No `ready` task already has a branch or worktree from another session. If one does,
   skip it and say so.
 
@@ -97,7 +99,9 @@ exists cost a fix round each; this is the minute of reading that catches them fi
 
 `Agent` tool, `subagent_type: builder`, **`isolation: "worktree"`**, `model: sonnet` by
 default. The worktree is created for you under `.claude/worktrees/` and branches from
-your current HEAD, which is why you stay on `develop`. Reuse the same builder via
+your current HEAD, which is why you stay on `develop`. For a stacked task, the brief
+names the base branch and the builder's first command is `git reset --hard <base>`,
+before `codegraph init`. Reuse the same builder via
 `SendMessage` for fix rounds; its context is warm and the worktree is already set up.
 
 The brief is the task file's **absolute path in the root checkout** (`tasks/` is
@@ -173,7 +177,9 @@ file on the same round, and neither saw the other's experiments.
   owns `review.md` / `review.json` there; both are gitignored.
 
 Both briefs carry: that reviewer's own path, the task file's absolute root path, the
-acceptance-test commit SHA, and the range to review (`develop..HEAD`).
+acceptance-test commit SHA, and the range to review (`develop..HEAD`). The code
+reviewer's brief also carries the builder's Try it transcript. Try it is a required
+check for the reviewer, run from a clean state, like the red proof.
 
 Both briefs must demand: verify by execution, not by reading; findings with severity,
 `file:line`, and a concrete failure scenario for anything called a bug; attention to
@@ -187,11 +193,12 @@ of what anyone scores it.
 ## 3. The loop — you in the middle
 
 ```
-while verdict != APPROVE or score < 4 or blocking/important findings remain:
+while verdict != APPROVE or score < 4 or blocking/important findings remain
+      or any Try it step fails:
     read both reports; for each finding decide: agree / disagree with evidence / needs human
     send the findings you agree with → builder (SendMessage), ONE numbered list,
         each with the required fix shape and how to re-verify
-    builder fixes and returns evidence
+    builder fixes and returns evidence, including a fresh Try it transcript
     reviewers re-review the DELTAS (git show <fix-shas>) in the worktree, re-run what
         they can, mark findings resolved with SHAs
 ```
@@ -217,8 +224,10 @@ while verdict != APPROVE or score < 4 or blocking/important findings remain:
 On approval, in the worktree, by you or by the builder under your instruction:
 
 1. `make check` green, tree clean.
-2. **Squash to one commit.** `git reset --soft $(git merge-base develop HEAD)` then one
-   commit. Subject `<type>(<id>): <title>`. The body is **bullets, not prose, hard cap
+2. **Squash to one commit.** `git reset --soft $(git merge-base <base> HEAD)` then one
+   commit, where `<base>` is `develop` or, for a stacked task, the dependency's branch.
+   Squashing against `develop` on a stacked branch folds the dependency's commit into
+   this one. Subject `<type>(<id>): <title>`. The body is **bullets, not prose, hard cap
    15 lines**, in exactly this shape:
 
    ```
@@ -235,8 +244,24 @@ On approval, in the worktree, by you or by the builder under your instruction:
    The review rounds, the fix history, and the story of how a bug was found do not go
    here. That belongs in `docs/ledger-findings.md`, which already has it. If a bullet
    needs a paragraph, it is a ledger entry, not a PR bullet.
-3. Push the branch. Open the PR with `gh pr create`, body from the commit message, same
-   cap. Then append the whole task file inside a collapsed block — `tasks/` is
+3. Push the branch. Open the PR with `gh pr create`. The body **opens with Try it**,
+   since it is what the human does with the PR:
+
+   ````
+   ## Try it
+   git fetch && git checkout <branch> && uv sync
+   <each Try it step from the task>
+   <details><summary>Output from the builder's run</summary>
+
+   ```
+   <the builder's real transcript, verbatim>
+   ```
+   </details>
+   ````
+
+   If the task's Try it is `None — <reason>`, the section says so, reason included. Then
+   the commit message body, same cap. Then append the whole task file inside a collapsed
+   block — `tasks/` is
    untracked, so **the merged PR is the only permanent record of the brief**:
 
    ```
@@ -294,12 +319,22 @@ failure available here.
 ## 7. Next task, and exit
 
 Run `make tasks` again and move to the next `ready` task. A task that depends on one now
-`in_review` **waits**: report that the batch is blocked on the human merging the PR and
-stop. Do not stack a build on top of an unreviewed branch.
+`in_review` stacks on it, as in section 0; keep going until nothing is `ready`. Build
+the chain in id order so each branch exists before its dependents need it. A task is
+`blocked` only when a dependency is unbuilt or two in-review dependencies sit on
+separate branches; report those and stop.
+
+**If the human asks for changes on a PR mid-stack**, fix it in its worktree, then
+rebase each dependent branch onto the new tip (`git rebase --onto <new> <old> <dep>`),
+re-run its gate and Try it, and force-push with lease. Never let a dependent PR carry a
+stale copy of its base.
 
 When the batch is finished or blocked, report, outcome first:
 
-- Per task: PR URL, verdict and score, the findings that mattered and their fixes.
+- Per task: PR URL, verdict and score, one line of what to try, the findings that
+  mattered and their fixes, and the base branch for stacked PRs.
+- The merge order: stacks bottom-up, each PR merged with **rebase and merge** so the
+  next one's base fast-forwards.
 - Tasks blocked on a merge, and which PR unblocks them.
 - Any model escalations and why.
 - **Findings by bin, with running sighting counts.**
@@ -316,6 +351,7 @@ When the batch is finished or blocked, report, outcome first:
 - **Never hand-edit `governance/views/**` or `governance/registry.json`.**
 - Secrets never appear in briefs, outputs, commits, or PR bodies.
 - Human-gated steps are reported as gates, never simulated or skipped past.
-- Dependent tasks wait for a merge. No speculative stacking.
+- Dependent tasks stack on their dependency's branch, never on a guess: a base is an
+  open PR that passed review, and a dependent PR is rebased whenever its base changes.
 - You stay on `develop`. You never `EnterWorktree`; subagents get isolation, you get the
   view from above.
