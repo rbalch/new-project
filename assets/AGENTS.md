@@ -60,13 +60,13 @@ feeds every finding into the ledger instead of letting it evaporate.
   ├──▶│ boundary-reviewer    live rules + this project's architectural seams│
   ├──▶│ reviewer             red-then-green proof, correctness, tests, shape│
   └──◀│ findings → you judge → builder → re-review → APPROVE, score ≥ 4/5  │
-      │ squash to one commit → push → PR to develop                        │
+      │ squash to one commit → push → PR to develop, or stacked on its dep │
       └───────────────────────────────────────────────────────────────────┘
   ▼  ═══ per task, after the PR is open. This is what makes it a ledger repo. ═══
   ├─ triage every finding → Bin 1 (lintable) / Bin 2 (systemic) / Bin 3 (taste)
   ├─ log sightings in docs/ledger-findings.md — orchestrator only
   ├─ a Bin 2 finding on its third sighting → control-author
-  └─ next task, if its dependencies have merged; otherwise wait for the human
+  └─ next task: dependencies merged, or stacked on their open PR's branch
 ```
 
 **Tests at the acceptance boundary come first.** The task file's acceptance criteria
@@ -75,9 +75,15 @@ checks out that commit and confirms the red. Unit tests below the boundary are t
 builder's call. A criterion that turns out wrong is a planning finding for the human,
 never a test to quietly rewrite.
 
+**Every task has a Try it.** Steps a person runs on the branch, with the output they
+should see. The builder runs them red then green, the reviewer re-runs them, the PR
+opens with them and the builder's real output. Green tests with a failing Try it is not
+done.
+
 **Branches.** Work lands on `develop` by PR, one PR per task, one squashed commit per
 PR whose body says what changed and why. `develop` to `main` is a human's PR. A task
-that depends on an unmerged task waits; nothing builds on an unreviewed branch.
+that depends on an open task stacks: it branches off that task's reviewed branch and
+its PR targets it. Nothing builds on an unbuilt or unreviewed branch.
 
 **The triage step is the point, and it is the one people skip.** A loop that fixes
 findings and forgets them is exactly the problem the harness exists to solve: the

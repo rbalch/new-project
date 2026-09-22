@@ -82,6 +82,11 @@ Then confirm the starting state:
   testable on top of the last.
 - No `ready` task already has a branch or worktree from another session. If one does,
   skip it and say so.
+- **Restack after merges.** For every open PR whose base PR has merged since the last
+  run, in its worktree: `git fetch && git rebase origin/develop` (git drops the
+  already-merged commit as patch-identical), re-run `make check`, force-push with lease,
+  and `gh pr edit --base develop` if GitHub did not retarget it. Otherwise the PR shows
+  its merged parent's diff as its own.
 
 Then, **for each task, before its builder exists**, dispatch `subagent_type: task-critic`,
 `model: sonnet`, in the root checkout — no worktree, it is read-only. Brief: the task file
@@ -107,19 +112,20 @@ before `codegraph init`. Reuse the same builder via
 The brief is the task file's **absolute path in the root checkout** (`tasks/` is
 untracked, so it is not in any worktree; every agent reads it from the root), plus:
 
-- **Worktree setup**: run `codegraph init` first so the graph reflects the tree being
-  edited, then `uv sync`. Report the worktree path in the return; you need it for the
+- **Worktree setup**: for a stacked task, `git reset --hard <base>` first. Then
+  `codegraph init` so the graph reflects the tree being edited, then `uv sync`. Report the worktree path in the return; you need it for the
   reviewers.
 - **Acceptance tests first.** Turn every runnable acceptance criterion in the task into
   a test, commit those tests alone as `test(<id>): acceptance for <title>`, run the
-  suite, and record the failing output. Then implement. This commit is the red proof
-  and the reviewer will check out that SHA.
+  suite, and record the failing output. Run the Try it steps and record that they fail
+  too. Then implement until both are green. This commit is the red proof and the
+  reviewer will check out that SHA.
 - **Environment facts**: everything happens in the worktree; `uv run` for every command;
   the task's `files` list is the expected footprint and anything beyond it is reported.
 - **Secret hygiene**: never print a token; run a `grep -rE 'token|secret|key'` sweep over
   changed files as a named verification, not a promise.
-- **Verification list**: the task's acceptance commands with expected results, and
-  `make check` exit 0.
+- **Verification list**: the task's acceptance commands with expected results,
+  `make check` exit 0, and every Try it step producing what the task says.
 - **Commit instructions**: small conventional commits, clean tree at the end. The
   history will be squashed by you, so commit freely.
 
@@ -132,7 +138,8 @@ Three ledger-specific additions:
 
 Require a structured return: worktree path, branch name, the acceptance-test commit SHA
 and its failing output, subsequent commit SHAs, per-verification evidence (**output, not
-claims**), the `make check` exit code, deviations from the task with reasons,
+claims**), the `make check` exit code, the Try it transcripts (failing before, passing after, real
+output verbatim), deviations from the task with reasons,
 blocked-by-a-rule items, and files touched outside the task's `files` list.
 
 ### Model escalation
@@ -177,7 +184,8 @@ file on the same round, and neither saw the other's experiments.
   owns `review.md` / `review.json` there; both are gitignored.
 
 Both briefs carry: that reviewer's own path, the task file's absolute root path, the
-acceptance-test commit SHA, and the range to review (`develop..HEAD`). The code
+acceptance-test commit SHA, and the range to review (`<base>..HEAD`, where `<base>` is
+`develop` or the stacked dependency's branch). The code
 reviewer's brief also carries the builder's Try it transcript. Try it is a required
 check for the reviewer, run from a clean state, like the red proof.
 
@@ -238,7 +246,7 @@ On approval, in the worktree, by you or by the builder under your instruction:
    - up to 3 bullets, only for things a reader would not guess; omit the section if none
    Evidence: <N> tests in <file>, make check exit 0, red-then-green on <sha>
    Check by hand:
-   - anything the human should verify or decide
+   - only what Try it does not cover: a decision, a judgement call; omit if none
    ```
 
    The review rounds, the fix history, and the story of how a bug was found do not go
@@ -334,8 +342,8 @@ When the batch is finished or blocked, report, outcome first:
 
 - Per task: PR URL, verdict and score, one line of what to try, the findings that
   mattered and their fixes, and the base branch for stacked PRs.
-- The merge order: stacks bottom-up, each PR merged with **rebase and merge** so the
-  next one's base fast-forwards.
+- The merge order: stacks bottom-up. Each PR is one commit, so rebase-merge or squash
+  both work; the next run restacks what is left (section 0).
 - Tasks blocked on a merge, and which PR unblocks them.
 - Any model escalations and why.
 - **Findings by bin, with running sighting counts.**

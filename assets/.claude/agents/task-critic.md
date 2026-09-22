@@ -30,7 +30,8 @@ tasks list in their `files:` blocks, plus the fixture under `tests/fixtures/`.
 
 Every function, class, method, field, module, fixture, or CLI flag named anywhere in
 **Scope** or **Acceptance** must exist in one of: the fixture target, the files of a
-dependency task that `make tasks` reports `done`, or this task's own `files:` list (in which
+dependency task that `make tasks` reports `done` or `in_review` (read the latter on its PR
+branch: `git show <branch>:<path>`), or this task's own `files:` list (in which
 case it is being created, and that is fine). Grep for each one. A name that exists
 nowhere is a finding; say where you looked.
 

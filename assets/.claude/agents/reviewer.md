@@ -29,8 +29,9 @@ report it; overlap is better than a gap.
 
 ## Required context
 
-Before writing anything, inspect the task file, the diff (`develop..HEAD` in the
-worktree), the files it touches, nearby code that establishes local patterns, the
+Before writing anything, inspect the task file, the diff (the range in your
+brief, `<base>..HEAD` in the worktree, where `<base>` is `develop` or the stacked
+dependency's branch), the files it touches, nearby code that establishes local patterns, the
 relevant tests, and `AGENTS.md` for architecture. The task file says what the change was
 *supposed* to do — "works correctly" and "satisfies the task" are different findings.
 
