@@ -325,8 +325,9 @@ the chain in id order so each branch exists before its dependents need it. A tas
 separate branches; report those and stop.
 
 **If the human asks for changes on a PR mid-stack**, fix it in its worktree, then
-rebase each dependent branch onto the new tip (`git rebase --onto <new> <old> <dep>`),
-re-run its gate and Try it, and force-push with lease. Never let a dependent PR carry a
+rebase each dependent in its own worktree, bottom-up (`git rebase --onto <new> <old>`
+there; git refuses to rebase a branch checked out in another worktree), re-run its gate
+and Try it, and force-push with lease. Never let a dependent PR carry a
 stale copy of its base.
 
 When the batch is finished or blocked, report, outcome first:
