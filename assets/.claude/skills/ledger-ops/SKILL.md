@@ -29,7 +29,8 @@ text does the damage.
 
 ## Authoring a decision
 
-`governance/decisions/DEC-N-<slug>.md`, next free integer for N:
+`governance/decisions/DEC-N-<slug>.md`, next free integer for N across `develop`, every epic branch and every open PR (the id rule in the
+`orchestrate` skill's section 5):
 
 ```markdown
 ---
@@ -94,8 +95,9 @@ flags.
 The only legal way to change a rule. Never edit code to evade a control, and never
 quietly loosen one.
 
-1. Author `DEC-N+1` with the new rule.
-2. On the old decision set `status: superseded` and `superseded_by: DEC-N+1`.
+1. Author the new rule as `DEC-M`, the next free id by the id rule in the `orchestrate`
+   skill's section 5 (not always the old id plus one).
+2. On the old decision set `status: superseded` and `superseded_by: DEC-M`.
 3. Add or modify the control(s) and their pragmas so CI enforces the new rule.
 4. `make views`
 5. `make governance`
@@ -109,8 +111,10 @@ reviewable act. Enforcement is automated; changing what is enforced is not.
 ```bash
 make views       # regenerate views/RULES.md + registry.json from decisions/
 make governance  # the integrity + drift check
-make check       # controls → views --check → governance → tests
+make check       # controls → views --check → governance → entries-check → tests
 ```
+
+Ledger and preference entry formats: `docs/ledger/TEMPLATES.md`; validate them with `make entries-check`.
 
 Never hand-edit `governance/views/**` or `governance/registry.json`. They are
 generated from the decision files, and CI rebuilds them and fails on any
@@ -143,6 +147,11 @@ If asked to add rules in bulk, refuse and say why. The value is *discovered*
 through review, not predicted. Rules imagined in advance are usually taste dressed
 as controls: brittle, firing on fine code, pure ceremony. Route the request through
 the `finding-triage` skill instead.
+
+Before a control for a hole that recurs at several call sites, look for the one
+function they share (`finding-triage` step 5). A fix there closes the hole for
+every site and is filed under `tasks/<plan>/fixes/` (`tasks/README.md`, *Fixes*); a control is for a hole
+with no such function, or one the human chose it for.
 
 ---
 

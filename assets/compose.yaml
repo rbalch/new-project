@@ -42,7 +42,7 @@ services:
     stdin_open: true
     tty: true
     env_file:
-      # Optional: .env is gitignored, so a fresh clone has none until you copy .env.example.
+      # Optional: .env is gitignored, so a fresh clone has none until you copy env.example.
       - path: .env
         required: false
     environment:

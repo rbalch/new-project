@@ -1,4 +1,4 @@
-.PHONY: help build init sync shell up down views views-check governance controls lint test check tasks
+.PHONY: help build init sync shell up down views views-check governance ledger preferences entries-check controls lint test check tasks
 
 .DEFAULT_GOAL := help
 
@@ -73,6 +73,22 @@ views-check: ## Fail if the generated files are stale or hand-edited
 governance: ## Integrity + drift check (the linchpin)
 	uv run python governance/scripts/check_governance.py
 
+# The ledger and the preferences are one file per entry (docs/ledger, docs/preferences); log_entries.py builds the views.
+# REFS=origin also counts the entries on every fetched origin branch (fetch first); the views are never a gate.
+REFS ?=
+
+ledger: ## Build build/ledger.md from docs/ledger (REFS=origin counts every fetched branch)
+	@case "$$REFS" in *[!A-Za-z0-9._/-]*) echo "REFS must be a remote name" >&2; exit 1;; esac
+	uv run python governance/scripts/log_entries.py view $(if $(REFS),--refs $(REFS))
+
+preferences: ## Build build/preferences.md from docs/preferences (REFS=origin adds every fetched branch); read it before deciding a fork
+	@case "$$REFS" in *[!A-Za-z0-9._/-]*) echo "REFS must be a remote name" >&2; exit 1;; esac
+	uv run python governance/scripts/log_entries.py view --kind preferences $(if $(REFS),--refs $(REFS))
+
+entries-check: ## Validate docs/ledger and docs/preferences (file names, fields, no duplicate id, every id named has its file)
+	uv run python governance/scripts/log_entries.py check
+	uv run python governance/scripts/log_entries.py check --kind preferences
+
 controls: lint ## Run every fitness control, then lint
 	@for c in controls/fitness/*.py; do \
 		echo "control: $$c"; \
@@ -87,10 +103,11 @@ lint: ## Ruff lint + format check + ty type check
 test: ## Run the test suite
 	uv run pytest -q
 
-check: ## The single gate: controls -> views --check -> governance -> tests
+check: ## The single gate: controls -> views --check -> governance -> ledger entries -> tests
 	$(MAKE) controls
 	$(MAKE) views-check
 	$(MAKE) governance
+	$(MAKE) entries-check
 	$(MAKE) test
 
 PLAN ?=

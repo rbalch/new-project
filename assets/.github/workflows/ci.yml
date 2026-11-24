@@ -6,11 +6,16 @@ name: CI
 #   controls      prove the rules bite
 #   views --check prove the generated view is current
 #   governance    prove nothing drifted
+#   entries       prove the ledger and preferences entries are well formed
 #   test          prove the harness itself works
 #
 # Do not reorder these. Running `governance` before `controls` would report drift in a
 # tree whose rules were never executed.
 
+# Gitflow with epics: task PRs target epic-<slug> (or, stacked, the branch of the task they
+# depend on), each epic lands on develop by a landing PR, and develop -> main is a human's PR.
+# So every pull request runs the gate, whatever its base. Pushes run only on main and develop:
+# an epic's tip is already checked by the next task PR's run and by its landing PR's run.
 on:
   pull_request:
   push:
@@ -45,6 +50,9 @@ jobs:
 
       - name: Governance
         run: make governance
+
+      - name: Ledger entries
+        run: make entries-check
 
       - name: Tests
         run: make test

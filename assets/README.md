@@ -80,6 +80,7 @@ fails on any drift between them.
   work gets done here.
 - **`docs/governance-harness.md`** explains why the harness exists and how to tell
   whether it is earning its keep.
-- **`docs/ledger-findings.md`** is the experiment log.
+- **`docs/ledger/`** is the experiment log, one file per finding or triage run; `make ledger`
+  builds it into one page. **`docs/preferences/`** holds the standing preferences.
 
 Change a rule by supersession, never by edit. See the `ledger-ops` skill.

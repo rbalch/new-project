@@ -7,7 +7,8 @@ description: Plan a piece of work with the human, then write the spec, the task 
 
 You are planning, not building. Nothing under `src/`, `tests/`, `controls/` or
 `governance/` changes during this skill. Your output is three kinds of document, and
-you write none of them until the human says the plan is agreed.
+you write none of them until the human says the plan is agreed. (One exception, `orchestrate` section 0:
+a held task whose file already fixes its scope gets its spec drafted by the orchestrator, no planner session.)
 
 ```
 conversation ──▶ agreed plan ──▶ docs/specs/<slug>.md
@@ -25,7 +26,8 @@ conversation ──▶ agreed plan ──▶ docs/specs/<slug>.md
   Never read `governance/decisions/` for rules.
 - `docs/specs/` and `docs/adr/` — prior plans and decisions. Do not re-decide something
   already decided; cite it.
-- `make tasks` — anything not yet `done`. A new plan that overlaps unfinished work needs
+- `make tasks` — anything not yet `done`, and any `done` task whose epic has not landed;
+  read its code on `origin/epic-<slug>`. A new plan that overlaps unfinished work needs
   to say so. `tasks/<slug>/` is untracked (only `tasks/README.md` is in git); the files
   live on this machine and the merged PRs hold the shipped briefs.
 
@@ -37,6 +39,12 @@ enough to break into tasks, and to surface what they have not said.
 - **Ask the questions that change the work.** Scope boundaries, what is explicitly out,
   the acceptance the human will actually check, which existing code this must match,
   what happens on failure. Do not ask what you can read from the tree.
+- **Ask only what the preferences do not settle** (after `git fetch --prune origin`, run `make preferences REFS=origin`
+  and read `build/preferences.md`; one under *On other branches, not settled* is context, not settled). Where a
+  preference decides a question, take it and list it under *Decisions* in the spec, citing its id.
+  Read the list for ideas too: propose what it implies that the human has not raised.
+  Distill each answer the human gives into a new or rewritten file under `docs/preferences/` before writing up,
+  with a date + slug id (`docs/preferences/TEMPLATES.md`).
 - **Ask what the human wants to inspect.** Every artifact the work produces — a
   database, files on disk, outbound calls, logs, an in-memory model — and how they want
   to look at it. Each one gets a way to look: a CLI command, a `make` target, a script,
@@ -50,6 +58,12 @@ enough to break into tasks, and to surface what they have not said.
   the ADR.
 - **Check the plan against the rules and the shape.** A plan that crosses a seam in
   `AGENTS.md` or a rule in `RULES.md` is raised here, never discovered by a builder.
+- **Check every fact the plan asserts, while you plan.** Open the API a task will call
+  and read its signatures; check a new dependency's current version, not the one you
+  remember; run `nvidia-smi` or `docker ps` when the plan names a GPU or a host port;
+  dry-run each Try it query against the data. Unchecked facts are a common
+  planning finding. A fact about a dependency
+  task that is not built yet cannot be checked; mark it as a guess in the task file.
 
 Stop iterating when the human says the plan is agreed. Do not write files before that.
 Do not ask "shall I write it up?" as a substitute for finishing the conversation.
@@ -67,6 +81,10 @@ The plan in prose, for a human to read and for tasks to link back to. Short. Sec
 - **Tasks** — the ordered list of task ids and titles, with the dependency edges, and
   for each one line: what the human can run or look at once it merges.
 - **Open questions** — anything deferred, and who owns it.
+- **Epic branch** — `epic-<slug>`, one line. Every task PR in the plan targets it, and it
+  reaches `develop` in landing PRs reviewed for blockers only (`orchestrate` sections 8 and 9).
+  It does not exist yet at hand-off: the spec goes to `develop` first, as its own PR
+  for the human's approval, and the epic is cut from `develop` once that PR merges (step 5).
 
 ## 3. The tasks — `tasks/<slug>/<PREFIX>-NN-<slug>.md`
 
@@ -100,9 +118,14 @@ tasks of models, repositories and services before anything runs is the failure t
 section exists to prevent: the human merges blind and finds out at task twenty that
 none of it does what they meant.
 
-- **T-01 runs.** The first task is a skeleton the human can start: the CLI answers
-  `--help`, the server returns 200, `import {package_name}` works and one call does
-  something. No features, but proof the thing is alive and how to run it.
+- **T-01 runs.** The first task is a skeleton the human can start, through the surfaces
+  the plan actually has: the CLI answers `--help`, a server (if the plan has one) returns
+  200, or `import {package_name}` works and one call does something. No features, but proof
+  the thing is alive and how to run it. Do not add a server to satisfy this. Behaviour
+  that only means something inside a long-running host is a class the host embeds: test
+  it directly and demo it with a paste-able snippet (`uv run python - <<'EOF'`), and let
+  the real caller wire it up in its own plan. No endpoint, server loop or daemon is
+  planned just to show it working.
 - **Each later task adds one thing the human can try.** A new command, a new flag, a new
   function they can call from a REPL, a new table they can query. Cut through layers to
   get there: a thin slice across model, storage and CLI beats a complete storage layer.
@@ -127,6 +150,23 @@ After writing the files run `make tasks PLAN=tasks/<slug>`. It validates the fro
 the prefix and the dependency edges, and shows every task `ready` or `blocked`. A
 message instead of a listing is a planning error to fix before hand-off.
 
+### Critic pass, before hand-off
+
+Dispatch one `subagent_type: task-critic` per task file, all in one
+message so they run at once, in the root checkout. Brief each with the task file path,
+that this is a **plan-time** pass, and the ids of its `depends_on` tasks. The human is
+still here, so fixing a defect now costs a question, not a stop in `/orchestrate`.
+
+- Take every finding to the human in the shape the orchestrate skill's *Talking to the
+  human* section describes, forks through `AskUserQuestion`. Apply what they decide,
+  then re-run the critic on each changed file until it reports `CLEAN`.
+- Brief the critic: when a task prescribes code that reads an existing data file (the ledger, a list, a fixture),
+  the brief tells the critic to load that file and list every form the code must read (each
+  heading, key or line shape, with a count), not only the file's size.
+- Findings that hang on an unbuilt dependency come back as `DEFERRED`, not blockers.
+  Report them in the hand-off; the orchestrator's critic checks them once the
+  dependency's branch exists.
+
 ## 4. The ADR — only when earned
 
 Write one only if the conversation chose between real alternatives that a future reader
@@ -142,8 +182,23 @@ the rule of three like anything else. Do not seed a `DEC-N` from a plan.
 ## 5. Hand-off
 
 Report the spec path, the task ids with their dependency edges and one line each of
-what the human can try after it merges, which tasks can run in parallel with which, and
-the ADR path if any. Then the two ways to run it:
+what the human can try after it merges, which tasks can run in parallel with which, the
+critic's `DEFERRED` items per task, and the ADR path if any.
+
+**Suggest sharing the spec with the team before the build.** That is the time for
+direction and design pushback; the landing PRs are reviewed for blockers only.
+At hand-off, open the spec and any ADR as a PR against `develop`, from a `spec-<slug>`
+worktree off `origin/develop` (`orchestrate` step 4.4, the spec-PR exception: base always
+`develop`, no triage, never `chore-*`), created with the reviewers `orchestrate` step 3 describes; give the human that PR's spec link to share. That PR
+is the human's approval of the plan. The task files stay untracked (`tasks/README.md`), so
+they are not in it. The plan's new preference files go in a check-in on the chore chain
+outside any epic (step 4.4), which also waits on a human merge; dispatch does not wait on
+it, and the spec cites those preference ids as pending until it lands. Do not cut `epic-<slug>`
+yet: it is cut from `develop` only after the spec PR has merged there, so the epic starts
+with the approved spec (`orchestrate` section 0). No task is dispatched before that. Say so in one line and leave the posting to the human: agents do not post to
+Slack or anywhere else for them.
+
+Then the two ways to run it:
 
 ```
 /orchestrate tasks/<slug>            # every task, in dependency order

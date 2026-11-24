@@ -47,8 +47,9 @@ disagreement.
 ## How work gets done here
 
 Two skills, in order. **`planner`** turns a conversation into a spec and task files.
-**`orchestrate`** turns task files into reviewed, squashed PRs against `develop`, and
-feeds every finding into the ledger instead of letting it evaporate.
+**`orchestrate`** turns task files into reviewed, squashed PRs against the spec's epic
+branch, merges them there, lands the epic on `develop`, and feeds every
+finding into the ledger instead of letting it evaporate.
 
 ```
 /planner                       you + the planner, until the plan is agreed
@@ -60,13 +61,15 @@ feeds every finding into the ledger instead of letting it evaporate.
   ├──▶│ boundary-reviewer    live rules + this project's architectural seams│
   ├──▶│ reviewer             red-then-green proof, correctness, tests, shape│
   └──◀│ findings → you judge → builder → re-review → APPROVE, score ≥ 4/5  │
-      │ squash to one commit → push → PR to develop, or stacked on its dep │
+      │ squash to one commit → push → PR to the epic, or stacked on its dep │
       └───────────────────────────────────────────────────────────────────┘
   ▼  ═══ per task, after the PR is open. This is what makes it a ledger repo. ═══
   ├─ triage every finding → Bin 1 (lintable) / Bin 2 (systemic) / Bin 3 (taste)
-  ├─ log sightings in docs/ledger-findings.md — orchestrator only
+  ├─ log sightings as new files under docs/ledger/ — orchestrator only, as its own PR on the chore chain
   ├─ a Bin 2 finding on its third sighting → control-author
-  └─ next task: dependencies merged, or stacked on their open PR's branch
+  ├─ next task: dependencies merged, or stacked on their open PR's branch
+  ├─ reviewed, CI green, Copilot handled → you merge the PR into the epic branch
+  └─ at spec end, or sooner if it grows (~4–10 merged PRs, a guide) → a landing PR, epic → develop, the human approves
 ```
 
 **Tests at the acceptance boundary come first.** The task file's acceptance criteria
@@ -80,10 +83,16 @@ should see. The builder runs them red then green, the reviewer re-runs them, the
 opens with them and the builder's real output. Green tests with a failing Try it is not
 done.
 
-**Branches.** Work lands on `develop` by PR, one PR per task, one squashed commit per
-PR whose body says what changed and why. `develop` to `main` is a human's PR. A task
+**Branches.** Each spec gets one epic branch, `epic-<slug>`, cut from `develop`. Work
+lands on it by PR, one PR per task, one squashed commit per PR whose body says what
+changed and why, and the orchestrator merges each one there once it is reviewed. A task
 that depends on an open task stacks: it branches off that task's reviewed branch and
-its PR targets it. Nothing builds on an unbuilt or unreviewed branch.
+its PR targets it. Nothing builds on an unbuilt or unreviewed branch. The epic lands
+on `develop` by a landing PR from the epic branch itself, at spec end or sooner if it grows
+(`orchestrate` section 9 has the guide and the draft-landing exemption). Landing
+PRs are the only PRs of the epic a human approves, reviewed for blockers only, rule and
+security changes aside; push back on direction at the spec, before the build.
+`develop` to `main` is a human's PR. The flow is in the `orchestrate` skill.
 
 **The triage step is the point, and it is the one people skip.** A loop that fixes
 findings and forgets them is exactly the problem the harness exists to solve: the
@@ -95,10 +104,12 @@ Skipping triage means running the experiment while discarding the data.
 | | What it is for |
 |---|---|
 | `planner` (skill) | Plan with the human. Writes the spec, the task files, an ADR if earned. |
-| `orchestrate` (skill) | Runs task files through build → review → PR → triage. Start here for any task. |
+| `orchestrate` (skill) | Runs task files through build → review → PR → merge into the epic → triage → landing PR. Start here for any task. |
 | `builder` (agent) | One task, in a worktree. Acceptance tests first. Never evades a control. |
 | `boundary-reviewer` (agent) | Live rules and this project's architectural seams. Reports; never edits. |
 | `reviewer` (agent) | Red-then-green proof, correctness, tests, maintainability. Owns `review.md` / `review.json`. |
+| `pr-feedback` (skill) | Copilot threads on open PRs: judge, fix, restack the stack, reply, resolve, merge into the epic, triage. |
+| `thread-judge` (agent) | One PR's Copilot threads: reproduce each, recommend fix or decline. Edits nothing. |
 | `finding-triage` (skill) | Sort one dislike into a bin. Apply the rule of three. |
 | `control-author` (agent) | Turn a thrice-sighted Bin 2 finding into a decision plus control. |
 | `ledger-ops` (skill) | Harness mechanics: author, supersede, add a control, debug a red gate. |
@@ -161,16 +172,84 @@ change was made.
      to absolute. Delete a line the moment it stops being true; a stale working-context
      section is worse than an empty one. -->
 
-**Current work:** <!-- TODO -->
+**Origin.** Started {today} as {project_name}. <!-- TODO: what it grew from (a POC, an
+     earlier system), and what may carry over from it. -->
+
+**What is in flight** is not kept in this file: run `make tasks` for each plan's state, and read
+`docs/specs/` for what each plan decided.
+
+## Working rules
+
+- **Decide unless torn.** Check the preferences first (`make preferences`, then read `build/preferences.md`); if one settles a choice,
+  take it and cite it. Ask the human only when two options are close and no preference
+  decides, or when the choice spends money, reaches people outside the team, or cannot be undone. Ask
+  as multiple choice: one question per fork, two to four options, each with a one-line
+  tradeoff, the recommended one first and labelled "(Recommended)", and say what makes it
+  close. In Claude Code that is the `AskUserQuestion` tool; batch every open fork in one
+  call.
+- **Report every choice made alone.** The recap and the PR body each carry a *Choices
+  made* list, one line per choice, citing the preference it followed if any. A preference
+  that keeps producing choices the human reverses is wrong; rewrite it.
+- **Distill as you go.** After the human settles a fork, overrides a choice, or rejects
+  output, add or rewrite a preference file under `docs/preferences/` in the same change, whenever
+  the answer reaches past the case at hand. Use the list to propose, not only to answer:
+  when planning, suggest what it implies that the human has not asked for.
+
+## Standing preferences
+
+How the human tends to decide, distilled from their answers. Not enforced and not governance.
+They start empty: a new project has none, and they grow as the human settles forks.
+They live in `docs/preferences/`, one file per preference, never in this file. Before deciding a
+fork, run `make preferences` and read `build/preferences.md`. With `REFS=origin`, a preference under
+*On other branches, not settled* is context only: it never settles a fork. A new one is a new file with a date +
+slug id (`P-MMDD-<slug>.md`); the format is in `docs/preferences/TEMPLATES.md`.
+
+## Dev environment
+
+**Nix is optional, and local to this machine.** `.nix/flake.nix` pins the toolchain (Python 3.13,
+uv, git, gh). It and `.envrc` are kept out of git (`.git/info/exclude` and `.gitignore`'s `*.env*`),
+so a teammate without them installs the same tools themselves. With nix and direnv installed,
+`direnv allow` once and `.envrc` loads that shell on `cd`. Without nix, `.envrc` skips it.
+Change tools in `.nix/flake.nix`, never by downloading a second Python: the shell sets `UV_PYTHON` and `UV_PYTHON_DOWNLOADS=never` so uv uses Nix's interpreter.
+An agent's shell does not run the direnv hook, so `uv: No such file or directory` means
+you are outside it: run commands as `direnv exec . make check`. Without direnv on the machine, drop
+the `direnv exec <dir>` prefix wherever a skill shows it.
+
+**The flake ships nearly empty on purpose, and is kept current though uncommitted.** It is ready
+for a teammate who wants it only if it lists what the project uses. Since `.nix/` is excluded from
+git, it exists only in the root checkout, never in a worktree. Whenever it exists: the first time an
+agent works in the repo, add every tool the Makefile, CI and `pyproject.toml` call for, and any
+tool the project starts using goes into the root checkout's `.nix/flake.nix` the same day. Never
+install a tool any other way. This is the one statement of the rule; the skills and agents point
+here.
+
+**Where settings and secrets go.** Each file is gitignored unless marked committed:
+
+| File | For | Committed |
+|---|---|---|
+| `.envrc` | Loads the flake, then `.env`, then `.envrc.local`. No values. | no (local) |
+| `env.example` | Template for `.env`: every variable, placeholder values only. | yes |
+| `.env` | Project settings that every dev and `compose.yaml` need (`GOOGLE_CLOUD_PROJECT`, shared service credentials). Copy from `env.example`. | no |
+| `.envrc.local` | Only you: personal tokens (`GH_TOKEN`), per-machine overrides. | no |
+
+Adding a project variable means adding it to `env.example` too, with a placeholder, in
+the same change. Never put a real value in a committed file, and never print one in a log
+or a response. `.gitignore` ignores `*.env*` (`env.example` has no leading dot, so it needs no
+exception); keep it that way. `.direnv/` is nix-direnv's per-machine cache; excluded, never
+committed.
 
 ## Commands
 
 ```bash
-make check       # the single gate: controls → views --check → governance → tests
+make check       # the single gate: controls → views --check → governance → entries-check → tests
 make views       # regenerate governance/views/RULES.md + registry.json
 make governance  # integrity + drift check (the linchpin)
 make controls    # every controls/fitness/*.py, plus ruff and ty
 make test        # pytest
+make entries-check  # ledger and preference files: names, ids, fields
+make tasks       # each plan's task status, derived from PR state (PLAN=tasks/<slug> for one)
+make ledger      # sighting counts → build/ledger.md (REFS=origin reads every branch)
+make preferences # standing preferences → build/preferences.md (REFS=origin reads every branch)
 ```
 
 `make check` is the only gate. Run it before you say a change is done.

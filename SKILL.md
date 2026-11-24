@@ -65,8 +65,9 @@ whether to proceed before writing anything.
 
 Copy every file from `~/.claude/skills/new-project/assets/` into the destination
 directory, preserving the directory structure. Include dotfiles and dot-directories —
-`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.env.example`, `.gitignore`,
-`.mcp.json` are all easy to miss with a naive glob.
+`.claude/`, `.devcontainer/`, `.github/`, `.editorconfig`, `.envrc`, `.gitignore`, `.nix/`,
+`.mcp.json` are all easy to miss with a naive glob. Skip caches (`__pycache__/`, `.ruff_cache/`,
+`.pytest_cache/`, `.venv/`) if any are lying around in `assets/`.
 
 Replace each placeholder in file **contents**. Two paths also carry a placeholder in
 their **name** and must be renamed:
@@ -83,22 +84,30 @@ Full manifest:
 .claude/agents/control-author.md
 .claude/agents/reviewer.md
 .claude/agents/task-critic.md
+.claude/agents/thread-judge.md
 .claude/skills/finding-triage/SKILL.md
 .claude/skills/ledger-ops/SKILL.md
 .claude/skills/orchestrate/SKILL.md
 .claude/skills/planner/SKILL.md
+.claude/skills/pr-feedback/SKILL.md
 .devcontainer/devcontainer.json
 .github/workflows/ci.yml
 controls/fitness/view_naming.py
 controls/lint/.gitkeep
 docs/adr/.gitkeep
 docs/governance-harness.md
-docs/ledger-findings.md
+docs/ledger/README.md
+docs/ledger/TEMPLATES.md
+docs/ledger/findings/.gitkeep     # one file per finding: F-MMDD-<slug>.md
+docs/ledger/runs/.gitkeep         # one file per triage run: YYYY-MM-DD-<slug>.md
+docs/preferences/.gitkeep         # one file per preference: P-MMDD-<slug>.md
+docs/preferences/TEMPLATES.md
 docs/specs/.gitkeep
 governance/decisions/DEC-0-generated-view-is-not-agents-md.md
 governance/registry.json          # generated — regenerated in step 5
 governance/scripts/build_views.py
 governance/scripts/check_governance.py
+governance/scripts/log_entries.py   # make ledger / preferences / entries-check
 governance/views/RULES.md         # generated — regenerated in step 5
 scripts/task-status.py            # make tasks — task status derived from PR state
 src/{package_name}/__init__.py
@@ -109,9 +118,12 @@ tests/governance/conftest.py
 tests/governance/ledger.py
 tests/governance/test_build_views.py
 tests/governance/test_check_governance.py
+tests/governance/test_log_entries.py
 tests/test_task_status.py          # guards make tasks: plan discovery, frontmatter, prefix rule
 .editorconfig
-.env.example
+.envrc
+env.example
+.nix/flake.nix
 .gitignore
 .mcp.json
 AGENTS.md
@@ -147,6 +159,9 @@ terminal for `gh auth login`. Mention them in the hand-off instead — see step 
 ```bash
 cd {project_name}
 git init
+# The Nix layer is personal: keep it out of every commit without naming it in .gitignore.
+# (.envrc and .envrc.local are already caught by .gitignore's *.env*.)
+printf '%s\n' '.nix/' '.direnv/' >> .git/info/exclude
 git checkout -b main
 git add .
 git commit -m "chore: initial project scaffold"
@@ -155,6 +170,12 @@ git checkout -b develop
 
 Unless the user specified different branch names in their request, use `main` as the
 default branch and create a `develop` branch off it.
+
+Then fill `.nix/flake.nix` right away: it ships nearly empty on purpose. Add every tool
+the project calls outside uv: what the Makefile, compose and CI run (e.g. `docker-client`
+for compose, `jq`), plus anything the user named for their stack. Ask if unsure; don't guess. Then,
+if nix and direnv are installed, run `direnv allow` and `direnv exec . make check` to
+prove the shell works. The flake never shows up in `git status`; that is intended.
 
 ### 7. Fill in AGENTS.md, then confirm
 
