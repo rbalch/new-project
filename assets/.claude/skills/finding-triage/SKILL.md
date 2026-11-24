@@ -55,29 +55,48 @@ meant to catch.
 1. **Restate the dislike** as a checkable claim. If you cannot state it so a
    machine could check it, that is strong evidence for Bin 3.
 2. **Assign the bin.** Say which and why, in one sentence.
-3. **Bin 1** → point at the linter rule that covers it. Done.
+3. **Bin 1** → point at the linter rule that covers it, then step 6.
 4. **Bin 3** → say plainly that no control will catch this and it stays a human
-   call. Done. This is a *good* outcome, not a failure.
-5. **Bin 2** → check `docs/ledger-findings.md` for prior sightings.
-   - Fewer than three → log the sighting, apply the soft correction, stop.
-   - Third sighting → propose a decision plus control. Hand off to the
-     `control-author` agent, or follow the `ledger-ops` skill.
-6. **Log it either way** (see below). The log *is* the experiment; an unlogged
-   finding is a lost data point.
+   call, then step 6. This is a *good* outcome, not a failure.
+5. **Bin 2** → check the ledger (`docs/ledger/`; after `git fetch --prune origin`, run `make ledger REFS=origin` and read the `count` column of
+   `build/ledger.md`) for prior sightings, counted across every branch as `orchestrate` section 0 says.
+   Search for the claim's mechanism, not only its words, so a new entry does not split
+   a count.
+   - Fewer than three → log the sighting, apply the soft correction, then step 6.
+   - Third sighting → first look for the one function the sites share, before a control
+     or a wrapper per site. If fixing
+     it would close the hole for every site, put the choice to the human: fix that
+     function (a fix filed under `tasks/<plan>/fixes/`, `tasks/README.md` *Fixes*; per-site
+     wrappers it makes redundant go in the same change; the entry says "closing at
+     the funnel instead" and is marked closed only when that fix merges; no control) or
+     write a control. If there is no such
+     function, or the human chose a control, propose a decision plus control: hand off to
+     the `control-author` agent, or follow the `ledger-ops` skill.
+6. **Distill a preference, whatever the bin.** Ask what the dislike says about how
+   the human decides. If it reaches past this case, add or rewrite a file under
+   `docs/preferences/` now, on the first sighting, with a date + slug id
+   (`docs/preferences/TEMPLATES.md`). The rule of three
+   guards controls, not preferences: a preference costs one file and is rewritten
+   freely, so it can afford to be early. Bin 3 is the richest source.
+7. **Log it either way** (see below). The log *is* the experiment; an unlogged
+   finding is a lost data point. A new finding's id is a date + slug id
+   (`docs/ledger/TEMPLATES.md`; the `orchestrate` skill's section 5).
 
 ## Logging
 
-Append to `docs/ledger-findings.md`:
+The ledger is one file per entry in `docs/ledger/`, so two PRs never edit the same file. Never edit
+an existing entry just to add a sighting.
 
-```markdown
-### F-<n> — <one-line description>
-- **Date:** YYYY-MM-DD
-- **Bin:** 2
-- **Claim:** <the dislike, stated so a machine could check it>
-- **Sightings:** 2 (F-3 was the first)
-- **Action:** soft — noted, no control yet
-- **Notes:** <anything surprising about the harness itself>
-```
+- A **new finding** is a new file under `docs/ledger/findings/`.
+- Each triage run is **one new file** under `docs/ledger/runs/`, whose `sights:` list holds one item
+  per independent sighting (a finding seen in two review rounds is listed twice). A new finding's
+  first sighting is the run that logs it.
+- A preference distilled in step 6 is noted in the run file, as a `- **Preferences:** <the preference ids added> …` line (not a
+  frontmatter field).
+- Counts come from `make ledger REFS=origin` (the table in `build/ledger.md`), not from a line in a finding.
+
+The templates, with every field, are in `docs/ledger/TEMPLATES.md`. Run `make entries-check` before
+committing.
 
 ## What the log is for
 

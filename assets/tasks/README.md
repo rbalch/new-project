@@ -1,7 +1,7 @@
 # Tasks
 
-One directory per plan, one file per task. The `planner` skill writes them; the
-`orchestrate` skill consumes them. A task file is a self-contained brief: an agent given
+One directory per plan, one file per task. The `planner` skill writes them (the orchestrator drafts a
+held follow-up when the human agrees, `orchestrate` section 3); the `orchestrate` skill consumes them. A task file is a self-contained brief: an agent given
 only that file, `AGENTS.md`, and `governance/views/RULES.md` has everything it needs.
 
 **`tasks/<slug>/` is untracked.** Only this README is in git. Task files are working
@@ -97,8 +97,9 @@ Plumbing-only tasks write `None — <reason>`; the planner keeps them rare.
 
 - **`depends_on` is a merge dependency**, not a "nice to have first". A task lists a
   dependency only when it cannot be built or tested without that task's code present.
-  A dependent task stacks on its dependency's branch once that PR is open, and its PR
-  targets that branch. It never branches off an unbuilt dependency.
+  Every task PR targets the plan's epic branch (`epic-<slug>`, the `orchestrate` skill's
+  section 4, step 3). A dependent task stacks on its dependency's branch once that PR is open, and
+  its PR targets that branch. It never branches off an unbuilt dependency.
 - **`files` is the parallelism signal.** Two tasks with no dependency and disjoint
   `files` can run in separate sessions at the same time. Overlapping `files` means run
   them in order, even with no logical dependency. The list is an expectation, not a
@@ -107,9 +108,19 @@ Plumbing-only tasks write `None — <reason>`; the planner keeps them rare.
   first and watches them fail. If a criterion turns out to encode a wrong assumption,
   that is a planning error to report, not a test to quietly rewrite.
 - **Status is derived, never stored.** `make tasks PLAN=tasks/<slug>` reads PR state:
-  a merged PR titled `<id>: …` is `done`, an open one `in_review`, all dependencies
+  a merged PR titled `<id>: …` (merged into the epic branch) is `done`, an open one `in_review`, all dependencies
   done or in review `ready` (stacked on the newest dependency branch if any is open), otherwise `blocked`. `make tasks` with no `PLAN` reports every plan.
   Nobody edits a task file to change its status. Builders never edit task files at all.
+- **A hold is not a status.** A task drafted ahead of its evidence (`orchestrate` section 3) opens its body with a
+  `> **Blocked: <condition>.**` line. `make tasks` cannot see it and may call the task `ready`.
+  The orchestrator skips a held task and reports the hold. Only the human lifts it, by deleting the line.
+- **Fixes.** An improvement to a plan's chain that the spec does not name goes in
+  `tasks/<plan>/fixes/`, not in the plan's own directory, so the plan's directory keeps
+  matching its spec. `make tasks` reads only the top level, so a fix's status is its PR. Its
+  id keeps the plan's prefix, so PR titles stay uniform: the next free number above the
+  plan's and the folder's highest. A held draft, a red-epic recovery task and a fix a
+  landing reviewer asks for (`orchestrate` sections 8 and 9) stay in the plan's directory,
+  since `make tasks` must see them.
 - **`make tasks` is the format check.** It exits with a message, not a traceback, when
   the plan directory is missing, has no task files, a file lacks `id`/`title`/
   `depends_on`, an id is malformed, prefixes are mixed or shared, or `depends_on` names

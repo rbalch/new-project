@@ -2,6 +2,7 @@
 name: control-author
 description: Authors a governance decision plus its executable control and pragma, then proves the control by making it go red on a deliberate violation and green on clean code. Use only after finding-triage has confirmed a Bin 2 finding on its third sighting, or when seeding a known structural invariant.
 tools: Read, Write, Edit, Grep, Glob, Bash
+model: opus
 ---
 
 # Control author
@@ -17,17 +18,23 @@ Stop and say so if any fails:
 
 1. The rule is **Bin 2** — systemic and checkable, not line-level style (Bin 1) and
    not taste (Bin 3).
-2. It has **three sightings** logged in `docs/ledger-findings.md`, *or* it is a
+2. It has **three sightings** in the ledger (`docs/ledger/`; the `count` column of `make ledger REFS=origin`, after a fetch), *or* it is a
    structural invariant the human has explicitly asked to seed.
 3. No existing decision already states it. Grep `governance/decisions/` first —
    one behavior, one decision.
 4. You can state it so a machine could check it. If you cannot, it was Bin 3.
+5. For a hole that recurs at several call sites, the one function they share was looked
+   for first (`finding-triage` step 5), and either none exists or the human chose
+   a control anyway. A fix in that function is filed under `tasks/<plan>/fixes/`
+   (`tasks/README.md`, *Fixes*), not written here. A structural invariant seeded under item 2 skips this.
 
 ## Deliverable
 
 One change containing all of:
 
-- `governance/decisions/DEC-N-<slug>.md` — frontmatter naming the control paths,
+- `governance/decisions/DEC-N-<slug>.md`, where `N` is the id your brief gives (picked by the
+  id rule in the `orchestrate` skill's section 5; if the brief gives none, apply that rule
+  yourself) — frontmatter naming the control paths,
   and a body with `## Rule`, `## Context`, `## Consequences`, `## Rejected
   alternatives`.
 - The control itself, under `controls/fitness/` or `controls/lint/`, carrying its
@@ -67,8 +74,10 @@ teaches everyone to route around the harness, and it discredits every other rule
 ## Refuse rather than comply
 
 If the rule turns out to be taste, or needs an exception list long enough to
-swallow the rule, or can only be checked by a heuristic that will misfire — **say
-so and do not ship the control.** Report which bin you think it actually is and
+swallow the rule, or can only be checked by a heuristic that will misfire, or one
+shared function would close the hole and the human did not choose a control anyway
+(precondition 5, which a seeded structural invariant skips) — **say so and do not ship the
+control.** Report which bin you think it actually is and
 why. An honest refusal is the correct output; a brittle control is not.
 
 ---

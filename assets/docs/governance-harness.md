@@ -79,7 +79,7 @@ wiki, and it should be dropped.**
 
 So do not evaluate this by "does CI go red." Evaluate it by "did the middle bin turn out
 to be real, and did my review load go down." That means the bin distribution has to be
-recorded honestly in `docs/ledger-findings.md`, including when it is unflattering. If
+recorded honestly in `docs/ledger/` (one file per entry), including when it is unflattering. If
 after weeks of real use nothing has graduated to the hard layer, that is a finding, not
 a failure of diligence.
 

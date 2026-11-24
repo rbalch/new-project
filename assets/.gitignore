@@ -27,8 +27,8 @@ build/
 .npm-install-changed.json
 
 # Env / secrets
+# env.example (no leading dot) is the committed template; real values live in .env.
 *.env*
-!.env.example
 key.json
 secret.pem
 
