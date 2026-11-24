@@ -2,7 +2,7 @@
 
 A [Claude Code](https://claude.com/claude-code) skill that scaffolds a Python project
 with a devcontainer, a `make check` gate, a planner → task files → orchestrator flow
-that lands one reviewed, squashed PR per task, and a governance harness that turns
+that lands one reviewed, squashed PR per task on an epic branch, and a governance harness that turns
 recurring review findings into CI-enforced rules.
 
 Run `/new-project my-api` and you get a directory that builds, lints, type-checks,
@@ -25,7 +25,8 @@ appear in the skill list.
 
 The skill asks for the package name, the container name, and a GCP project id, then
 writes `./my-api`, runs `uv sync`, verifies `make check` exits 0, and initializes git
-with `main` and `develop` branches.
+with `main` and `develop` branches. It then fills the local Nix flake (see
+[Nix](#nix)).
 
 It finishes by offering to fill in the four `<!-- TODO -->` sections of `AGENTS.md`.
 Those are the parts no template can supply — what the project is, its architectural
@@ -40,14 +41,18 @@ my-api/
 ├── Makefile                    make check is the single gate
 ├── pyproject.toml              ruff (B/I/RUF/UP), ty, pytest, all pinned
 ├── compose.yaml                dev container
+├── env.example                 template for .env; every variable, placeholder values only
+├── .envrc                      direnv: loads the flake, .env, .envrc.local (ignored by git)
+├── .nix/flake.nix              local Nix shell (kept out of commits, see Nix)
 ├── dev.Dockerfile
 ├── .devcontainer/
 ├── .github/workflows/ci.yml    the same gate as make check, staged so failures are named
 ├── .claude/
-│   ├── agents/                 task-critic · builder · reviewer · boundary-reviewer · control-author
-│   └── skills/                 planner · orchestrate · ledger-ops · finding-triage
+│   ├── agents/                 task-critic · builder · reviewer · boundary-reviewer · control-author · thread-judge
+│   └── skills/                 planner · orchestrate · pr-feedback · ledger-ops · finding-triage
 ├── tasks/                      README.md is the task file format; tasks/<slug>/ is untracked, the PR keeps the brief
 ├── scripts/task-status.py      make tasks — status derived from PR state, never stored
+├── build/                      GENERATED, ignored: make ledger and make preferences write here
 ├── governance/
 │   ├── decisions/              DEC-N-<slug>.md — the canon, retains superseded records
 │   ├── scripts/                build_views.py, check_governance.py
@@ -58,9 +63,12 @@ my-api/
 │   ├── specs/                  one spec per plan, written by the planner
 │   ├── adr/                    design decisions with rejected alternatives, when earned
 │   ├── governance-harness.md   why the harness exists, and how to tell if it works
-│   └── ledger-findings.md      the experiment log
+│   ├── ledger/
+│   │   ├── findings/           F-MMDD-<slug>.md, one file per finding
+│   │   └── runs/               YYYY-MM-DD-<slug>.md, one file per orchestrator run
+│   └── preferences/            P-MMDD-<slug>.md, how the human decides; starts empty
 ├── src/my_api/
-└── tests/governance/           57 tests covering the harness itself
+└── tests/governance/           95 tests covering the harness itself
 ```
 
 ## The harness
@@ -126,8 +134,22 @@ its keep. If nearly everything collapses into "already lintable" or "genuine tas
 is complicated linters plus a wiki, and it should be dropped.**
 
 Do not judge it by "does CI go red." Judge it by whether the middle bin turned out to be
-real. That is why `docs/ledger-findings.md` exists and why the distribution has to be
+real. That is why `docs/ledger/` exists and why the distribution has to be
 recorded honestly, including when it is unflattering.
+
+### The ledger and preferences
+
+Every entry is its own file with a dated id: `F-MMDD-<slug>.md` for findings,
+`YYYY-MM-DD-<slug>.md` for runs, `P-MMDD-<slug>.md` for preferences. Parallel PRs add
+files and never collide on a shared log or a counter.
+
+`make ledger` and `make preferences` build readable views into `build/`. With
+`REFS=origin` they also count entries on fetched branches, so a sighting logged in one
+open PR counts toward the rule of three before it merges. `make entries-check` validates
+the entry files; it runs inside `make check` and in CI.
+
+`AGENTS.md` carries a "decide unless torn" rule. The agent reads `make preferences`
+first, takes the choice a preference settles, and asks only when none does.
 
 ### What it is not
 
@@ -141,13 +163,19 @@ where it belongs: a human looks at the diff and decides.
 /planner                    you + the planner until the plan is agreed
    └─▶ docs/specs/<slug>.md · tasks/<slug>/<PREFIX>-NN-*.md · docs/adr/ if alternatives were rejected
 
+epic-<slug>                 one epic branch per spec, cut from develop
+
 /orchestrate tasks/<slug>   per task, in dependency order:
    builder (own worktree)   codegraph init → acceptance tests committed RED → implement GREEN
    boundary-reviewer        live rules + architectural seams
    reviewer                 checks out the red commit, confirms green at HEAD, then correctness
    orchestrator             judges every finding itself, bounces to the builder, APPROVE ≥ 4/5
-   land                     squash to one commit (what + why) → PR to develop, stacked if dependent
+   land                     squash to one commit (what + why) → PR to the epic, stacked if dependent
    triage                   every finding binned and logged, orchestrator only, rule of three
+   merge                    reviewed + CI green + Copilot handled → orchestrator merges into the epic
+
+landing PR                  epic-<slug> → develop; the human approves
+develop → main              a human's PR
 ```
 
 Tests come first at the **acceptance boundary only**: the task file's acceptance
@@ -157,11 +185,25 @@ the one thing a post-hoc test cannot prove, that the test was written against th
 and not fitted to the code, without the churn of unit-level TDD on a design nobody has
 seen yet.
 
-Dependent tasks stack: each branches off its predecessor's open PR, so one run leaves a
-chain of PRs to try and merge bottom-up. Parallelism is manual: open a second session
-and hand it a task with disjoint `files`. The triage step is the point,
-and it is the one people skip. A loop that fixes findings and forgets them is the problem
-the harness claims to solve.
+Every task also has a **Try it**: steps a person runs on the branch, with the output they
+should see. The builder runs them red then green, the reviewer re-runs them, and the PR
+opens with them. Green tests with a failing Try it is not done.
+
+Each spec gets one epic branch. Task PRs target it, one squashed commit each. A task
+that depends on an open task branches off that task's reviewed branch and its PR targets
+that branch. The orchestrator merges each PR into the epic once it is reviewed, CI is
+green and Copilot is handled. The epic lands on `develop` through one landing PR, always
+at spec end and sooner if it grows (about 4 to 10 merged PRs is the guide). Landing PRs
+are the only PRs a human approves, reviewed for blockers.
+
+When Copilot reviews, the `pr-feedback` skill takes over. A `thread-judge` agent reads
+each open thread per PR, reproduces the claim, and recommends fix, decline or
+needs-human. Agreed fixes go through a builder and both reviewers, the stack is
+restacked, each thread is answered and resolved, and findings are triaged.
+
+Parallelism is manual: open a second session and hand it a task with disjoint `files`.
+The triage step is the point, and it is the one people skip. A loop that fixes findings
+and forgets them is the problem the harness claims to solve.
 
 ## Seeded rules
 
@@ -176,13 +218,44 @@ teaches everyone to route around the harness.
 
 ## Requirements
 
-Docker, `uv`, and Claude Code. The scaffolded project targets Python 3.13.
+Claude Code, plus one of:
+
+- Docker and `uv`, or
+- Nix and direnv, which supply `uv`, Python 3.13 and the rest.
+
+The scaffolded project targets Python 3.13.
+
+## Nix
+
+Nix is a supported, first-class path. It comes in two layers.
+
+**Scaffolded projects.** Each gets a near-empty `.nix/flake.nix` and an `.envrc`. The
+scaffold adds `.nix/` and `.direnv/` to `.git/info/exclude`, and `.gitignore`'s `*.env*`
+already covers `.envrc`. So the Nix layer is personal: it never lands in the project's
+commits, and a teammate without Nix never sees it.
+
+- The agent fills the flake at scaffold time with every tool the project calls outside
+  uv (`docker-client`, `jq`, and so on).
+- The orchestrator keeps it current as part of daily work: a check before each run.
+  Builders report a new tool; they never install one. The flake stays ready to share if
+  a teammate wants it.
+- The shell pins `UV_PYTHON` to Nix's Python and sets `UV_PYTHON_DOWNLOADS=never`, so
+  uv never fetches a second interpreter.
+- An agent's shell does not run the direnv hook. Agents run commands as
+  `direnv exec . make check`.
+- Run `direnv allow` once. Without Nix, `.envrc` skips the flake and everything works
+  as before.
+
+**This repo.** It has a committed `.nix/flake.nix` and `.envrc` for working on the
+template itself. Run `direnv allow` once.
 
 ## Layout of this repo
 
 ```
 SKILL.md     the skill definition Claude Code reads
 assets/      the template tree, copied verbatim with {placeholder} substitution
+.nix/        flake for working on this repo (committed; scaffolds get their own copy from assets/)
+.envrc       loads that flake through direnv
 ```
 
 Placeholders substituted at scaffold time: `{project_name}`, `{package_name}`,
