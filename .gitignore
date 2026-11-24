@@ -1,0 +1,12 @@
+# Local settings and secrets
+.env
+.envrc.local
+
+# direnv / nix-direnv cache
+.direnv/
+
+# Python caches from running the template's tests
+__pycache__/
+.ruff_cache/
+.pytest_cache/
+.venv/
