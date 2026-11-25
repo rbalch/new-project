@@ -18,6 +18,23 @@ Produce exactly two files at that worktree's root: `review.md` and `review.json`
 are gitignored. Overwrite them each run from scratch. Never append to prior output, and
 never carry a prior finding forward unless it is still present in the current diff.
 
+## Review stage and risk assessment
+
+Read `AGENTS.md` **Outside PR feedback: worth fixing now?** Use its scales and
+exceptions; do not define another threshold here. The brief must name `local-build`
+or `pr-feedback` and include prior accepted limitations. If the stage is missing,
+ask the orchestrator for it before issuing a verdict.
+
+For every bug finding, report the trigger, evidence, likelihood (1–5) and reason,
+impact (1–5) and reason, product, action, and any exception. For style-only feedback,
+use impact 1. Disproved claims need no score; unknown facts need a focused check,
+then `needs-human` if they still decide the outcome.
+
+In `local-build`, keep the existing fix loop. In `pr-feedback`, the shared policy
+controls whether a finding blocks, regardless of generic severity labels below.
+Accepted limitations cannot force a fix round or readiness below 4. Reopen a prior
+decision only with new evidence or an explicit human override, and state what changed.
+
 ## Division of labour
 
 `boundary-reviewer` runs alongside you and owns two things: the live rules in
@@ -252,7 +269,14 @@ minor and nit remain.
 ## Finding requirements
 
 Each finding carries: `severity`, `file`, `symbol_or_area`, `issue`, `why_it_matters`,
-`concrete_fix`, `blocks_merge`.
+`concrete_fix`, `blocks_merge`, `trigger`, `evidence`, `likelihood`,
+`likelihood_reason`, `impact`, `impact_reason`, `risk_score`, `action`, `exception`.
+Use null for scores that cannot be established; explain why. `action` is `fix`,
+`accept_limitation`, `decline`, or `needs_human`. For accepted limitations,
+`concrete_fix` is null and `blocks_merge` is false. Include `review_stage` and
+`prior_decisions` in both outputs. Severity describes the concern; the stage policy
+controls action and blocking. In `pr-feedback`, verdict and readiness constraints
+refer to findings that still require action, not accepted limitations.
 
 Specific enough for a builder to act on without guessing. "Improve error handling" and
 "add tests" are not findings unless you name the behaviour and why it needs coverage.
@@ -302,17 +326,9 @@ Write `None.` under any empty category.
     { "name": "try it", "result": "pass", "notes": "3 steps from clean state; output matches task and builder transcript" },
     { "name": "make check", "result": "pass", "notes": "exit 0" }
   ],
-  "findings": [
-    {
-      "severity": "important",
-      "file": "src/example/config.py",
-      "symbol_or_area": "resolve_bind_address",
-      "issue": "The change duplicates existing behavior instead of using the shared helper.",
-      "why_it_matters": "The duplicated path can drift and create inconsistent results.",
-      "concrete_fix": "Route the new call through the existing helper and extend it if needed.",
-      "blocks_merge": true
-    }
-  ],
+  "review_stage": "local-build",
+  "prior_decisions": [],
+  "findings": [],
   "counts": { "blocker": 0, "important": 0, "minor": 0, "nit": 0 },
   "stop_reason": "approved"
 }

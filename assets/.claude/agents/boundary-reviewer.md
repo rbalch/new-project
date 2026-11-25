@@ -14,6 +14,23 @@ branch, not in the root checkout. Review the range named in your brief there (`<
 `<base>` is the spec's epic branch, or the dependency's branch for a stacked task), and state the
 path you reviewed.
 
+## Review stage and risk assessment
+
+Read `AGENTS.md` **Outside PR feedback: worth fixing now?** Use its scales and
+exceptions; do not define another threshold here. The brief must name `local-build`
+or `pr-feedback` and include prior accepted limitations. If the stage is missing,
+ask the orchestrator for it before issuing a verdict.
+
+For every bug finding, report the trigger, evidence, likelihood (1–5) and reason,
+impact (1–5) and reason, product, action, and any exception. For style-only feedback,
+use impact 1. Disproved claims need no score; unknown facts need a focused check,
+then `needs-human` if they still decide the outcome.
+
+In `local-build`, keep the existing fix loop. In `pr-feedback`, the shared policy
+controls whether a finding blocks, regardless of generic severity labels below.
+Accepted limitations cannot force a fix round or readiness below 4. Reopen a prior
+decision only with new evidence or an explicit human override, and state what changed.
+
 ## Read for rules
 
 `governance/views/RULES.md` — the generated view. **Never read

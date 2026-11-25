@@ -195,6 +195,62 @@ change was made.
   the answer reaches past the case at hand. Use the list to propose, not only to answer:
   when planning, suggest what it implies that the human has not asked for.
 
+### Outside PR feedback: worth fixing now?
+
+Every review brief names its stage: `local-build` or `pr-feedback`. Use `pr-feedback`
+for outside feedback on a PR targeting `develop` or `main`, including landing PRs,
+and for every review of the resulting fixes. A fix made on a task branch for such a
+PR keeps that stage. Local builds and ordinary task PRs into epic branches use
+`local-build`: keep their current fix loop and 5/5 target.
+
+All reviewers assess bug findings with likelihood and impact, using the scales below.
+The numbers describe the current supported use, not hypothetical future requirements.
+For `pr-feedback`, their product decides whether to change the PR:
+
+- **Below 8: accept the limitation.** Reply with the evidence and score; leave the code
+  alone. Do not add a comment, test, follow-up task, or issue by default.
+- **8 or above: fix.** Use the existing build and review flow.
+- **Incorrect claim: decline**, with evidence. Do not score a disproved bug.
+- **Missing evidence:** do a focused check. If the decision still depends on unknown
+  facts, report `needs-human`; do not invent a number or treat uncertainty as low risk.
+
+| Score | Likelihood in current supported use | Impact in that scenario |
+|---|---|---|
+| 1 | Several unusual conditions together, unsupported use, or a hypothetical future change | Cosmetic or negligible |
+| 2 | Concrete supported scenario, but no evidence users encounter it | Small inconvenience; easy recovery |
+| 3 | Expected to occur in supported use; name when and why | Task fails; easy workaround |
+| 4 | Routine input or operating conditions | Major function fails; hard recovery |
+| 5 | The relevant normal path consistently fails | Data loss, security breach, or broad outage |
+
+Name the trigger, evidence, and a short reason for each score. A forced reproduction
+proves possibility, not likelihood. Impact means the actual consequence, not a chain
+of imagined worse outcomes. Style-only feedback has impact 1; do not invent a future
+bug to raise it. The product is separate from the reviewer's 1–5 readiness score.
+
+**Exceptions:** explicit requirement failures, failed required checks, and live
+`DEC-N` violations remain blocking regardless of score. Credible security or data-loss
+findings require a fix or an explicit human decision even below 8. Show a reachable
+failure; a label alone does not establish an exception. An explicit human request to
+change something before approval remains unsettled until that human accepts the
+limitation or the change lands. Never use the score to bypass required approval.
+
+In `pr-feedback`, this policy takes precedence over generic severity floors, automatic
+blockers such as false success "no matter how unlikely", and the local 5/5 target,
+except for the exceptions above. An accepted limitation cannot block approval or lower
+readiness below 4. Do not edit code just to improve the readiness score. Review fixes
+and their regressions; do not restart the local polish loop.
+
+Carry prior decisions in each review brief. Match them by failure condition, not just
+wording or reviewer. Reopen only for new evidence about likelihood or impact, or an
+explicit human override. Another report or reproduction of the same case is not new
+evidence. Preserve the decision and cite its thread or ledger entry.
+
+Examples (with no exception): a forced combination causing a recoverable task failure
+is L1 × I3 = 3, accept; an uncommon small inconvenience is L2 × I2 = 4, accept; an
+expected task failure is L3 × I3 = 9, fix; an uncommon major failure is L2 × I4 = 8, fix.
+For example: `Accept limitation — L1 × I3 = 3, below 8. Requires <conditions>;
+<evidence>. Failure has <workaround>. No change planned.`
+
 ## Standing preferences
 
 How the human tends to decide, distilled from their answers. Not enforced and not governance.
