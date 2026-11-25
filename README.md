@@ -201,6 +201,14 @@ each open thread per PR, reproduces the claim, and recommends fix, decline or
 needs-human. Agreed fixes go through a builder and both reviewers, the stack is
 restacked, each thread is answered and resolved, and findings are triaged.
 
+Outside feedback on PRs into `develop` or `main` uses a shared likelihood × impact
+assessment, each scored 1–5. Below 8, accept the limitation without a code change or
+follow-up task; at 8 or above, fix. Explicit requirements, required checks, live rules,
+and credible security or data-loss findings retain their exceptions. Reviewers carry
+these decisions through fix rounds and reopen them only for new evidence or an explicit
+human override. Local review keeps its current loop and 5/5 target. The full policy
+lives in the scaffold's `AGENTS.md`.
+
 Parallelism is manual: open a second session and hand it a task with disjoint `files`.
 The triage step is the point, and it is the one people skip. A loop that fixes findings
 and forgets them is the problem the harness claims to solve.

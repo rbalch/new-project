@@ -82,6 +82,13 @@ meant to catch.
    finding is a lost data point. A new finding's id is a date + slug id
    (`docs/ledger/TEMPLATES.md`; the `orchestrate` skill's section 5).
 
+For accepted limitations under `AGENTS.md`'s outside PR feedback policy, repeated
+reports of the same unchanged case are decision updates, not fresh sightings toward
+the rule of three. Use `updates:`, not `sights:`, in the new run. Preserve the original
+scores and decision link; record any new evidence or explicit human override. The
+ordinary sighting rules still apply to other findings. Acceptance does not itself
+call for a task, issue, code change, or control.
+
 ## Logging
 
 The ledger is one file per entry in `docs/ledger/`, so two PRs never edit the same file. Never edit

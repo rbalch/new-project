@@ -1,6 +1,7 @@
 ---
 name: orchestrate
-description: Run task files through the build→review→triage loop. For each task, in dependency order: a builder in its own worktree, acceptance tests first, two reviewers, findings mediated by you until approved, then squash, push, and a PR to the spec's epic branch, which you merge there once CI and Copilot are handled. The epic lands on develop by a landing PR from the epic branch itself, always at spec end (or once only human-run work is left) and sooner if it grows (on average 4 to 10 merged PRs as a guide; suggest one to the human when well past that, never force it). Triage findings into the ledger after each task. Use with a task directory or a single task file written by the planner skill.
+description: >-
+  Run task files through the build→review→triage loop. For each task, in dependency order: a builder in its own worktree, acceptance tests first, two reviewers, findings mediated by you until approved, then squash, push, and a PR to the spec's epic branch, which you merge there once CI and Copilot are handled. The epic lands on develop by a landing PR from the epic branch itself, always at spec end (or once only human-run work is left) and sooner if it grows (on average 4 to 10 merged PRs as a guide; suggest one to the human when well past that, never force it). Triage findings into the ledger after each task. Use with a task directory or a single task file written by the planner skill.
 ---
 
 # Orchestrate
@@ -102,7 +103,7 @@ Only a preference in the working tree or on `origin/develop` settles a fork. One
 `## On other branches, not settled`, with the branches it is on, has not reached `develop`: read it as
 context, never cite it as settling a choice, and treat its id as taken.
 Re-run before each triage. Each `sights:` item in a run file is one
-independent sighting, and distinct rounds on one PR stay distinct sightings (a finding seen in
+independent sighting (accepted limitations follow section 5), and distinct rounds on one PR stay distinct sightings (a finding seen in
 two rounds is listed twice); section 5's same-batch grouping still applies. Counts include
 triage of task PRs not yet merged, or later abandoned, on purpose: a sighting records what a review
 saw, which stays true whatever happens to the task. Section 5 and
@@ -331,16 +332,28 @@ acceptance-test commit SHA, and the range to review (`<base>..HEAD`, where `<bas
 reviewer's brief also carries the builder's Try it transcript. Try it is a required
 check for the reviewer, run from a clean state, like the red proof.
 
+Both briefs name `review_stage: local-build` for ordinary task work and pass prior
+accepted limitations. Fixes made for outside feedback on a PR into `develop` or `main`
+use `review_stage: pr-feedback` even when the fix lands through a task PR. Carry this
+stage through every fix and re-review. All reviewers return the risk assessment from
+`AGENTS.md` **Outside PR feedback: worth fixing now?**
+
 Both briefs must demand: verify by execution, not by reading; findings with severity,
 `file:line`, and a concrete failure scenario for anything called a bug; attention to
-interface contracts, failure direction (ambiguity fails closed, a false success is always
-blocking), secrets in outputs, and regressions against earlier rounds; a verdict and a
+interface contracts, failure direction (false success is blocking in `local-build`;
+`pr-feedback` uses the shared policy), secrets in outputs, and regressions against earlier rounds; a verdict and a
 score out of 5.
 
 **A boundary finding citing a `DEC-N` is blocking, always.** CI will fail on it regardless
 of what anyone scores it.
 
 ## 3. The loop — you in the middle
+
+The loop below is the `local-build` default. In `pr-feedback`, apply the shared
+`AGENTS.md` policy first: only findings requiring action enter the fix list or count
+as blocking/important for the loop. Accepted limitations do not lower readiness
+below 4. The cheap-nit and 5/5 instructions below apply only to `local-build`.
+Pass the stage and prior decisions to the builder and both reviewers every round.
 
 ```
 while verdict != APPROVE or score < 4 or blocking/important findings remain
@@ -576,6 +589,11 @@ pushing.
 This is the one statement of the rule; the steps that write or push ids,
 here and in `planner`, `finding-triage`, `pr-feedback`, `ledger-ops` and the
 `control-author` agent, cite it.
+
+Accepted limitations from `pr-feedback` retain their scores, evidence, action, and
+thread link in ledger body text. Repeated reports of the same unchanged accepted case
+use `updates:`, not fresh `sights:` toward the rule of three. They do not create a
+follow-up task or control by default. See `docs/ledger/TEMPLATES.md`.
 
 Run each non-trivial finding from the whole task through the three bins:
 
@@ -814,7 +832,7 @@ section 0 does, before any further merge into it.
 
 - **Copilot on a landing PR starts no fix round.** Its threads repeat what the small PRs
   settled, so each gets an acknowledgement and is resolved, as `pr-feedback` step 1 says (its
-  round cap applies from the first pass). Only a real blocker is fixed, the way a human's is.
+  round cap applies from the first pass). Only a finding requiring a fix under the shared PR risk policy is fixed, the way a human's is.
 - **A fix the human reviewers ask for** is a task PR into `epic-<slug>`: a new task file
   in the plan's directory, through sections 0 to 8 like any other. The landing PR updates
   when it merges. Its triage check-in (step 4.4) counts as part of the fix and merges into
@@ -823,7 +841,8 @@ section 0 does, before any further merge into it.
 
 ## Hard rules
 
-- **Never let a task pass with a known path to exit-0-on-failure.**
+- **In `local-build`, never let a task pass with a known path to exit-0-on-failure.**
+  In `pr-feedback`, use the shared risk policy and its exceptions.
 - **Never edit code to evade a control**, and never accept a change that does. Rule
   change is a supersession diff a human reviews.
 - **Never hand-edit `governance/views/**` or `governance/registry.json`.**

@@ -12,6 +12,13 @@ A new finding is never only a `(new)` bullet in a run: it gets its own file. In 
 A bare `F-MMDD` passes only while one finding has that prefix; a second finding that day turns it red.
 Only F and H ids named in ledger bodies are checked. P ids, DEC ids and preference bodies are not.
 
+For accepted limitations under `AGENTS.md`'s outside PR feedback policy, repeated
+reports of the same unchanged case are decision updates, not fresh sightings toward
+the rule of three. Use `updates:`, not `sights:`, in the new run. Preserve the original
+scores and decision link; record any new evidence or explicit human override. The
+ordinary sighting rules still apply to other findings. Acceptance does not itself
+call for a task, issue, code change, or control.
+
 ## A new finding: `docs/ledger/findings/<id>.md`
 
 The id is `F-MMDD-<slug>` (or `H-MMDD-<slug>` for a harness finding): the month and day, then the slug
@@ -34,6 +41,11 @@ bin: '2'                         # '1', '2' or '3'; null for a harness finding (
 - **Claim:** <the dislike, stated so a machine could check it>
 - **Action:** soft — noted, no control yet   <!-- or: DEC-N, a control authored -->
 - **Notes:** <anything surprising about the harness itself>
+<!-- For outside PR feedback, add these body fields; not new frontmatter fields. -->
+- **Risk:** L<n> (<reason>) × I<n> (<reason>) = <product>; exception: <none or reason>
+- **Evidence:** <trigger, supported-use evidence, actual consequence>
+- **Decision:** <fix / accept limitation / decline / needs human>; <thread link>
+- **Reopened:** <new evidence or explicit human override, if any>
 ```
 
 ## A new run: `docs/ledger/runs/<date>-<slug>.md`

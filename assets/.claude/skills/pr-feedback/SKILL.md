@@ -122,6 +122,13 @@ any human threads left open, and stop.
 
 ## 1. Judge each thread
 
+Read `AGENTS.md` **Outside PR feedback: worth fixing now?** Set
+`review_stage: pr-feedback` for outside feedback on PRs targeting `develop` or `main`; use
+`local-build` for ordinary task PRs into epic branches. Read prior replies and ledger
+notes for decisions on the same failure condition, including resolved threads. Pass
+the stage, prior decisions and their links to every judge, builder, and reviewer.
+A fix routed to an earlier task PR keeps the originating review stage.
+
 **One `thread-judge` per PR with open threads, all dispatched in one message so they run
 in parallel.** `subagent_type: thread-judge`, no worktree isolation
 (it is read-only and works in the PR's named worktree). Brief: PR number and task id, the
@@ -135,29 +142,37 @@ criteria below. Where its evidence does not support its recommendation, or it gu
 instead of running something, send it back via `SendMessage`. If it says the defect
 lives in an earlier PR, the fix moves to that PR's builder. The criteria:
 
-- **A claim that reproduces is a fix**, unless a reason below applies. A claim that does
+- **In `pr-feedback`, apply the shared risk policy before the criteria below.**
+  Below threshold, reply `Accept limitation — L<n> × I<n> = <score>: <evidence and
+  reason>. No change planned.` No builder, code comment, test, or follow-up task is
+  needed. Use the decline reply/resolution path for these accepted limitations;
+  human threads stay open. Explicit human approval conditions remain unsettled.
+  Record the assessment and prior decision link in the step-2 table. Unknown facts
+  get a focused check, then needs-human if unresolved. Exceptions follow `AGENTS.md`.
+  Do not re-score a settled case without new evidence or a human override.
+- **In `local-build`, a claim that reproduces is a fix**, unless a reason below applies. A claim that does
   not reproduce is a decline, with the command that shows why.
-- **Fix** when it reproduces, or when it is a security property that is cheap to test:
+- **In `local-build`, fix** when it reproduces, or when it is a security property that is cheap to test:
   test it, do not only state it.
 - **Decline** for one of these reasons, named in the reply:
   - it does not reproduce (show what you ran);
   - it belongs to a later task in the plan (cite that task's id);
   - the fix costs more than the case is worth: a narrow, local-only path (a default
-    credential that only a local dev setup uses, say). Decline it and document the limit in a comment
-    next to the code, which is itself a small fix;
+    credential that only a local dev setup uses, say). In `local-build`, document the limit in a comment
+    next to the code, which is itself a small fix. In `pr-feedback`, leave code unchanged;
   - it contradicts a standing preference or a live rule (cite the preference's id or the `DEC-N`).
 - **Needs human** when it would change a task's acceptance criteria, cross into another
   task's scope, or turn on a fork no preference settles.
 - **On a landing PR, the default is acknowledge.** Its threads repeat what the small PRs
   settled, so no fix round starts there (the round cap below, from the first pass). The reply is
-  `Acknowledged: settled in #n (<one line>).`, or `Acknowledged as a follow-up: <one line>.`,
-  and the thread is resolved with step 2's declines. Only a real blocker (a bug, a security
-  hole, something actually wrong) is a fix, and it lands as a task PR into the epic
+  `Acknowledged: settled in #n (<one line>).`, or the scored acceptance reply above,
+  and resolve Copilot threads through step 2's decline path; human threads stay open.
+  Only findings requiring a fix under the shared policy change code, via a task PR into the epic
   (`orchestrate` section 9), never as a commit on the landing PR.
 - **Copilot re-raising a thread we already declined** on an earlier review keeps the
   decline. The reply points at the earlier one, unless Copilot added new evidence.
 - **Count the rounds.** A PR that has had three Copilot fix rounds gets no fourth:
-  every thread its next review raises is **needs human**, with your recommendation, and
+  every finding still requiring a fix after the stage policy is **needs human**, with your recommendation, and
   the run stops there for that PR. Three rounds in, either Copilot has drifted or our
   approach is wrong, so the stop is a diagnosis with the human, who decides between
   fixing, a follow-up or merging as is. This is the one statement of the cap. Count from the PR's history (each re-request after a
@@ -231,7 +246,9 @@ so this is a fresh one. Its brief:
 - Scope is the threads. Anything else it notices is reported, not fixed.
 - The same secret hygiene and structured return as `orchestrate` section 1.
 
-**Reviewers:** exactly as `orchestrate` sections 2 and 3. The code reviewer works in the
+**Reviewers:** as `orchestrate` sections 2 and 3, with the originating review stage
+and prior accepted limitations in both briefs. In `pr-feedback`, the shared risk
+policy governs action and approval; accepted limitations cannot force another round. The code reviewer works in the
 builder's worktree, the boundary reviewer in its own detached checkout. The range is
 `<pr-branch>..HEAD`, plus the red-test SHA. Loop until APPROVE at a score of at least
 4 out of 5. A reviewer finding outside the threads' footprint is a new finding for you
@@ -324,12 +341,18 @@ section 8 says: every Copilot thread resolved or acknowledged, none waiting on a
 no unsettled human ask (section 8), and CI green, and no Copilot review requested since its latest diff change still
 pending (`orchestrate` section 8's completed-review condition). These merges need no confirm, as in an `orchestrate` run (`orchestrate`
 section 8). A PR whose diff just changed waits for Copilot's re-review and the next run,
-unless the PR has had its three fix rounds (step 1): then that review's threads go to the
-human as needs-human, never into a fourth round.
+unless the PR has had its three fix rounds (step 1): then findings still requiring
+a fix go to the human as needs-human, never into a fourth round. Accepted limitations
+keep their normal reply path and do not consume a fix round.
 
 ## 6. Triage and report
 
-Triage every thread as `orchestrate` section 5 does, declines included. Log the
+Triage every thread as `orchestrate` section 5 does, declines included. For
+`pr-feedback`, record trigger, evidence, both scores and reasons, product, action,
+exception if any, and decision link in the existing ledger entry text. An accepted
+limitation gets no follow-up task or control by default. Repeated reports of the same
+unchanged accepted case are updates to its decision history, not fresh `sights:`.
+A changed assessment must name the new evidence or human override. Log the
 sightings as one new run file per run under `docs/ledger/runs/` (its `sights:` list; never edit an
 existing entry to add one). A new finding is a new file under `docs/ledger/findings/` with a date + slug id
 (`docs/ledger/TEMPLATES.md`); preference ids are date + slug (`docs/preferences/TEMPLATES.md`). The useful
